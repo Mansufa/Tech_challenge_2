@@ -4,6 +4,9 @@ import random
 import itertools
 from genetic_algorithm import mutate, order_crossover, generate_random_population, calculate_fitness, sort_population, default_problems
 from draw_functions import draw_paths, draw_plot, draw_cities
+import time
+import csv
+import json
 import sys
 import numpy as np
 import pygame
@@ -21,6 +24,7 @@ PLOT_X_OFFSET = 450
 N_CITIES = 15
 POPULATION_SIZE = 100
 N_GENERATIONS = None
+TIME_LIMIT_SECONDS = 120  # 2 minutes
 MUTATION_PROBABILITY = 0.5
 
 # Define colors
@@ -62,6 +66,7 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("TSP Solver using Pygame")
 clock = pygame.time.Clock()
 generation_counter = itertools.count(start=1)  # Start the counter at 1
+start_time = time.time()
 
 
 # Create Initial Population
@@ -130,9 +135,88 @@ while running:
     pygame.display.flip()
     clock.tick(FPS)
 
+    # check time limit
+    elapsed = time.time() - start_time
+    if elapsed >= TIME_LIMIT_SECONDS:
+        print(f"Time limit reached ({TIME_LIMIT_SECONDS}s). Stopping...")
+        running = False
+
 
 # TODO: save the best individual in a file if it is better than the one saved.
 
 # exit software
 pygame.quit()
+
+# After exiting main loop, save top 50 results to CSV
+try:
+    results = []
+    for idx, fit in enumerate(best_fitness_values):
+        sol = best_solutions[idx]
+        gen = idx + 1
+        results.append((fit, gen, sol))
+
+    # sort by fitness (ascending) and take top 50
+    results_sorted = sorted(results, key=lambda x: x[0])
+    top_k = results_sorted[:50]
+
+    csv_path = "top50_results.csv"
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["rank", "generation", "fitness", "route_json"])
+        for rank, (fitness, generation, route) in enumerate(top_k, start=1):
+            writer.writerow(
+                [rank, generation, round(fitness, 6), json.dumps(route)])
+
+    print(f"Top {len(top_k)} results saved to {csv_path}")
+except Exception as e:
+    print("Failed to write results CSV:", e)
+
+# Also write a structured JSON with the top 50 results
+try:
+    json_path = "top50_results.json"
+    json_list = []
+    for rank, (fitness, generation, route) in enumerate(top_k, start=1):
+        json_list.append({
+            "rank": rank,
+            "generation": generation,
+            "fitness": round(fitness, 6),
+            "route": route,
+        })
+
+    with open(json_path, "w", encoding="utf-8") as jf:
+        json.dump({
+            "created_at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+            "time_limit_seconds": TIME_LIMIT_SECONDS,
+            "count": len(json_list),
+            "top_results": json_list,
+        }, jf, indent=2, ensure_ascii=False)
+
+    print(f"Top {len(json_list)} results saved to {json_path}")
+except Exception as e:
+    print("Failed to write results JSON:", e)
+
 sys.exit()
+
+# After exiting main loop, save top 50 results to CSV
+try:
+    results = []
+    for idx, fit in enumerate(best_fitness_values):
+        sol = best_solutions[idx]
+        gen = idx + 1
+        results.append((fit, gen, sol))
+
+    # sort by fitness (ascending) and take top 50
+    results_sorted = sorted(results, key=lambda x: x[0])
+    top_k = results_sorted[:50]
+
+    csv_path = "top50_results.csv"
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["rank", "generation", "fitness", "route_json"])
+        for rank, (fitness, generation, route) in enumerate(top_k, start=1):
+            writer.writerow(
+                [rank, generation, round(fitness, 6), json.dumps(route)])
+
+    print(f"Top {len(top_k)} results saved to {csv_path}")
+except Exception as e:
+    print("Failed to write results CSV:", e)

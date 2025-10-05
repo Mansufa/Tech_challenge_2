@@ -2,15 +2,16 @@
 
 import random
 import math
-import copy 
+import copy
 from typing import List, Tuple
 
 default_problems = {
-5: [(733, 251), (706, 87), (546, 97), (562, 49), (576, 253)],
-10:[(470, 169), (602, 202), (754, 239), (476, 233), (468, 301), (522, 29), (597, 171), (487, 325), (746, 232), (558, 136)],
-12:[(728, 67), (560, 160), (602, 312), (712, 148), (535, 340), (720, 354), (568, 300), (629, 260), (539, 46), (634, 343), (491, 135), (768, 161)],
-15:[(512, 317), (741, 72), (552, 50), (772, 346), (637, 12), (589, 131), (732, 165), (605, 15), (730, 38), (576, 216), (589, 381), (711, 387), (563, 228), (494, 22), (787, 288)]
+    5: [(733, 251), (706, 87), (546, 97), (562, 49), (576, 253)],
+    10: [(470, 169), (602, 202), (754, 239), (476, 233), (468, 301), (522, 29), (597, 171), (487, 325), (746, 232), (558, 136)],
+    12: [(728, 67), (560, 160), (602, 312), (712, 148), (535, 340), (720, 354), (568, 300), (629, 260), (539, 46), (634, 343), (491, 135), (768, 161)],
+    15: [(512, 317), (741, 72), (552, 50), (772, 346), (637, 12), (589, 131), (732, 165), (605, 15), (730, 38), (576, 216), (589, 381), (711, 387), (563, 228), (494, 22), (787, 288)]
 }
+
 
 def generate_random_population(cities_location: List[Tuple[float, float]], population_size: int) -> List[List[Tuple[float, float]]]:
     """
@@ -41,23 +42,163 @@ def calculate_distance(point1: Tuple[float, float], point2: Tuple[float, float])
     return math.sqrt((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2)
 
 
-def calculate_fitness(path: List[Tuple[float, float]]) -> float:
+def calculate_fitness(
+    path: List[Tuple[float, float]],
+    priorities: List[float] = None,
+    demands: List[float] = None,
+    vehicle_count: int = 1,
+    capacity: float = float("inf"),
+    max_distance: float = float("inf"),
+    depot: Tuple[float, float] = (0.0, 0.0),
+    return_routes: bool = False,
+) -> float:
     """
-    Calculate the fitness of a given path based on the total Euclidean distance.
+    Calculate a fitness for a route permutation that supports a simple capacitated
+    multi-vehicle routing formulation with priorities and maximum route distance.
 
-    Parameters:
-    - path (List[Tuple[float, float]]): A list of tuples representing the path,
-      where each tuple contains the coordinates of a point.
+    Behaviour & assumptions (reasonable defaults applied when arguments omitted):
+    - `path` is a permutation (list) of city coordinates (x, y).
+    - `priorities` is a list of same length as `path` with higher numbers meaning
+      more important customers. If None, all priorities are treated as 1.0.
+    - `demands` is a list of same length as `path` describing demand/load per city.
+      If None, all demands are treated as 1.0.
+    - `vehicle_count` number of vehicles available to serve cities in the order
+      they appear in `path`. A simple greedy assignment fills vehicles in sequence.
+    - `capacity` per-vehicle capacity. If a single city's demand > capacity the
+      city will be assigned but a large penalty is applied.
+    - `max_distance` is the maximum allowed route distance per vehicle. If exceeded
+      a penalty is applied. Distances include travel from and back to `depot`.
+    - `depot` is the vehicle depot coordinates (default (0,0)).
+    - By default the function returns a single float (lower is better). If
+      `return_routes=True` the function returns a tuple (fitness, routes) where
+      `routes` is a list of lists of city indices assigned to each vehicle.
 
-    Returns:
-    float: The total Euclidean distance of the path.
+    The fitness is computed as: total_distance + big_penalty * (priority-weighted
+    sum of unassigned or severely violated demands) . The design keeps the
+    function backward-compatible with existing code that expects a float.
     """
-    distance = 0
     n = len(path)
-    for i in range(n):
-        distance += calculate_distance(path[i], path[(i + 1) % n])
 
-    return distance
+    # Default priorities and demands
+    if priorities is None:
+        priorities = [1.0] * n
+    if demands is None:
+        demands = [1.0] * n
+
+    # Sanity: if provided lists don't match length, fallback to defaults
+    if len(priorities) != n:
+        priorities = [1.0] * n
+    if len(demands) != n:
+        demands = [1.0] * n
+
+    # Prepare assignment structures
+    routes: List[List[int]] = [[] for _ in range(vehicle_count)]
+    route_loads: List[float] = [0.0] * vehicle_count
+    route_distances: List[float] = [0.0] * vehicle_count
+
+    unassigned_indices: List[int] = []
+
+    # Helper to compute route distance given a sequence of points (includes depot returns)
+    def route_distance_from_indices(indices: List[int]) -> float:
+        if not indices:
+            return 0.0
+        dist = 0.0
+        last = depot
+        for idx in indices:
+            dist += calculate_distance(last, path[idx])
+            last = path[idx]
+        dist += calculate_distance(last, depot)
+        return dist
+
+    # Greedy assignment: iterate cities in `path` order and try to place into a vehicle
+    for city_idx, city in enumerate(path):
+        demand = demands[city_idx]
+        placed = False
+        # Try to place into any vehicle (greedy: fill vehicle 0..V-1)
+        for v in range(vehicle_count):
+            tentative_indices = routes[v] + [city_idx]
+            tentative_load = route_loads[v] + demand
+            tentative_distance = route_distance_from_indices(tentative_indices)
+
+            # If tentative respects both capacity and max_distance, accept
+            if tentative_load <= capacity and tentative_distance <= max_distance:
+                routes[v].append(city_idx)
+                route_loads[v] = tentative_load
+                route_distances[v] = tentative_distance
+                placed = True
+                break
+
+        # If couldn't place respecting constraints, try to place anyway in the least-bad vehicle
+        if not placed:
+            # Find vehicle that increases distance the least (even if it violates constraints)
+            best_v = None
+            best_extra = float("inf")
+            for v in range(vehicle_count):
+                tentative_indices = routes[v] + [city_idx]
+                tentative_distance = route_distance_from_indices(
+                    tentative_indices)
+                extra = tentative_distance - route_distances[v]
+                if extra < best_extra:
+                    best_extra = extra
+                    best_v = v
+
+            if best_v is not None:
+                routes[best_v].append(city_idx)
+                route_loads[best_v] += demand
+                route_distances[best_v] = route_distance_from_indices(
+                    routes[best_v])
+            else:
+                unassigned_indices.append(city_idx)
+
+    total_distance = sum(route_distances)
+
+    # Penalties
+    PENALTY_UNASSIGNED = 1e6
+    PENALTY_CAPACITY = 1e4
+    PENALTY_DISTANCE = 1e4
+
+    penalty = 0.0
+
+    # Unassigned cities (ideally shouldn't happen with the greedy fallback, but safe)
+    if unassigned_indices:
+        penalty += PENALTY_UNASSIGNED * \
+            sum(priorities[i] for i in unassigned_indices)
+
+    # Per-route violations
+    for v in range(vehicle_count):
+        # capacity violation
+        if route_loads[v] > capacity:
+            # severity scaled by overload and by average priority of route
+            avg_priority = (
+                sum(priorities[i] for i in routes[v]) /
+                len(routes[v]) if routes[v] else 1.0
+            )
+            overload = route_loads[v] - capacity
+            penalty += PENALTY_CAPACITY * overload * avg_priority
+
+        # distance violation
+        if route_distances[v] > max_distance:
+            avg_priority = (
+                sum(priorities[i] for i in routes[v]) /
+                len(routes[v]) if routes[v] else 1.0
+            )
+            excess = route_distances[v] - max_distance
+            penalty += PENALTY_DISTANCE * excess * avg_priority
+
+    # Reward serving high-priority customers by subtracting a small fraction of fulfilled priority
+    served_priority = 0.0
+    for v in range(vehicle_count):
+        served_priority += sum(priorities[i] for i in routes[v])
+
+    # Objective: minimize total_distance minus a small reward for serving priority,
+    # plus penalties for violations.
+    PRIORITY_REWARD = 0.01  # small reward to prefer routes that serve higher priority early
+    fitness = total_distance - PRIORITY_REWARD * served_priority + penalty
+
+    if return_routes:
+        return fitness, routes
+
+    return fitness
 
 
 def order_crossover(parent1: List[Tuple[float, float]], parent2: List[Tuple[float, float]]) -> List[Tuple[float, float]]:
@@ -81,7 +222,8 @@ def order_crossover(parent1: List[Tuple[float, float]], parent2: List[Tuple[floa
     child = parent1[start_index:end_index]
 
     # Fill in the remaining positions with genes from parent2
-    remaining_positions = [i for i in range(length) if i < start_index or i >= end_index]
+    remaining_positions = [i for i in range(
+        length) if i < start_index or i >= end_index]
     remaining_genes = [gene for gene in parent2 if gene not in child]
 
     for position, gene in zip(remaining_positions, remaining_genes):
@@ -89,7 +231,7 @@ def order_crossover(parent1: List[Tuple[float, float]], parent2: List[Tuple[floa
 
     return child
 
-### demonstration: crossover test code
+# demonstration: crossover test code
 # Example usage:
 # parent1 = [(1, 1), (2, 2), (3, 3), (4,4), (5,5), (6, 6)]
 # parent2 = [(6, 6), (5, 5), (4, 4), (3, 3),  (2, 2), (1, 1)]
@@ -115,9 +257,8 @@ def order_crossover(parent1: List[Tuple[float, float]], parent2: List[Tuple[floa
 #           for _ in range(3)]
 
 
-
-# TODO: implement a mutation_intensity and invert pieces of code instead of just swamping two. 
-def mutate(solution:  List[Tuple[float, float]], mutation_probability: float) ->  List[Tuple[float, float]]:
+# TODO: implement a mutation_intensity and invert pieces of code instead of just swamping two.
+def mutate(solution:  List[Tuple[float, float]], mutation_probability: float) -> List[Tuple[float, float]]:
     """
     Mutate a solution by inverting a segment of the sequence with a given mutation probability.
 
@@ -130,22 +271,23 @@ def mutate(solution:  List[Tuple[float, float]], mutation_probability: float) ->
     """
     mutated_solution = copy.deepcopy(solution)
 
-    # Check if mutation should occur    
+    # Check if mutation should occur
     if random.random() < mutation_probability:
-        
+
         # Ensure there are at least two cities to perform a swap
         if len(solution) < 2:
             return solution
-    
+
         # Select a random index (excluding the last index) for swapping
         index = random.randint(0, len(solution) - 2)
-        
+
         # Swap the cities at the selected index and the next index
-        mutated_solution[index], mutated_solution[index + 1] = solution[index + 1], solution[index]   
-        
+        mutated_solution[index], mutated_solution[index +
+                                                  1] = solution[index + 1], solution[index]
+
     return mutated_solution
 
-### Demonstration: mutation test code    
+# Demonstration: mutation test code
 # # Example usage:
 # original_solution = [(1, 1), (2, 2), (3, 3), (4, 4)]
 # mutation_probability = 1
@@ -180,53 +322,51 @@ def sort_population(population: List[List[Tuple[float, float]]], fitness: List[f
 
 if __name__ == '__main__':
     N_CITIES = 10
-    
+
     POPULATION_SIZE = 100
     N_GENERATIONS = 100
     MUTATION_PROBABILITY = 0.3
     cities_locations = [(random.randint(0, 100), random.randint(0, 100))
-              for _ in range(N_CITIES)]
-    
+                        for _ in range(N_CITIES)]
+
     # CREATE INITIAL POPULATION
     population = generate_random_population(cities_locations, POPULATION_SIZE)
 
     # Lists to store best fitness and generation for plotting
     best_fitness_values = []
     best_solutions = []
-    
+
     for generation in range(N_GENERATIONS):
-  
-        
-        population_fitness = [calculate_fitness(individual) for individual in population]    
-        
-        population, population_fitness = sort_population(population,  population_fitness)
-        
+
+        population_fitness = [calculate_fitness(
+            individual) for individual in population]
+
+        population, population_fitness = sort_population(
+            population,  population_fitness)
+
         best_fitness = calculate_fitness(population[0])
         best_solution = population[0]
-           
+
         best_fitness_values.append(best_fitness)
-        best_solutions.append(best_solution)    
+        best_solutions.append(best_solution)
 
         print(f"Generation {generation}: Best fitness = {best_fitness}")
 
         new_population = [population[0]]  # Keep the best individual: ELITISM
-        
+
         while len(new_population) < POPULATION_SIZE:
-            
+
             # SELECTION
-            parent1, parent2 = random.choices(population[:10], k=2)  # Select parents from the top 10 individuals
-            
+            # Select parents from the top 10 individuals
+            parent1, parent2 = random.choices(population[:10], k=2)
+
             # CROSSOVER
             child1 = order_crossover(parent1, parent2)
-            
-            ## MUTATION
+
+            # MUTATION
             child1 = mutate(child1, MUTATION_PROBABILITY)
-            
+
             new_population.append(child1)
-            
-    
+
         print('generation: ', generation)
         population = new_population
-    
-
-
