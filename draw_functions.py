@@ -1,9 +1,4 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Dec 22 16:03:11 2023
 
-@author: SérgioPolimante
-"""
 import pylab
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,16 +11,7 @@ matplotlib.use("Agg")
 
 
 def draw_plot(screen: pygame.Surface, x: list, y: list, x_label: str = 'Generation', y_label: str = 'Fitness') -> None:
-    """
-    Draw a plot on a Pygame screen using Matplotlib.
 
-    Parameters:
-    - screen (pygame.Surface): The Pygame surface to draw the plot on.
-    - x (list): The x-axis values.
-    - y (list): The y-axis values.
-    - x_label (str): Label for the x-axis (default is 'Generation').
-    - y_label (str): Label for the y-axis (default is 'Fitness').
-    """
     fig, ax = plt.subplots(figsize=(4, 4), dpi=100)
     ax.plot(x, y)
     ax.set_ylabel(y_label)
@@ -35,19 +21,17 @@ def draw_plot(screen: pygame.Surface, x: list, y: list, x_label: str = 'Generati
     canvas = FigureCanvasAgg(fig)
     canvas.draw()
 
-    # Try a few fallback methods to get raw image bytes from the canvas since
-    # different Matplotlib versions expose different APIs.
     width, height = canvas.get_width_height()
 
     raw_data = None
-    # Preferred: canvas.tostring_rgb() -> returns RGB bytes
+
     if hasattr(canvas, "tostring_rgb"):
         try:
             raw_data = canvas.tostring_rgb()
         except Exception:
             raw_data = None
 
-    # Fallback: buffer_rgba() or tostring_argb()
+        # Alternative methods to get RGB data from canvas
     if raw_data is None:
         if hasattr(canvas, "buffer_rgba"):
             buf = canvas.buffer_rgba()
@@ -79,6 +63,11 @@ def draw_plot(screen: pygame.Surface, x: list, y: list, x_label: str = 'Generati
     size = (width, height)
     surf = pygame.image.fromstring(raw_data, size, "RGB")
     screen.blit(surf, (0, 0))
+    # Close the figure to free memory and avoid too many open figures warning
+    try:
+        plt.close(fig)
+    except Exception:
+        pass
 
 
 def draw_cities(screen: pygame.Surface, cities_locations: List[Tuple[int, int]], rgb_color: Tuple[int, int, int], node_radius: int) -> None:
