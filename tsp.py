@@ -10,7 +10,6 @@ import json
 import sys
 import numpy as np
 import pygame
-from benchmark_att48 import *
 
 
 # Define constant values
@@ -22,9 +21,13 @@ PLOT_X_OFFSET = 450
 
 # GA
 N_CITIES = 15
+# Garantir número mínimo de cidades
+if N_CITIES < 20:
+    print(f"N_CITIES ({N_CITIES}) menor que 20 — ajustando para 20")
+    N_CITIES = 20
 POPULATION_SIZE = 100
 N_GENERATIONS = None
-TIME_LIMIT_SECONDS = 120  # 2 minutes
+TIME_LIMIT_SECONDS = 10  # 2 minutes
 MUTATION_PROBABILITY = 0.5
 
 # Define colors
@@ -34,30 +37,42 @@ RED = (255, 0, 0)
 BLUE = (0, 0, 255)
 
 
-# Initialize problem
-# Using Random cities generation
-# cities_locations = [(random.randint(NODE_RADIUS + PLOT_X_OFFSET, WIDTH - NODE_RADIUS), random.randint(NODE_RADIUS, HEIGHT - NODE_RADIUS))
-#                     for _ in range(N_CITIES)]
+# Gera posições aleatórias de cidades dentro da área definida (respeitando margens)
+# e garantindo um espaçamento mínimo entre cidades
+MIN_CITY_DISTANCE = 30  # pixels, ajuste conforme necessário para espaçamento maior
+cities_locations = []
+max_attempts = 1000
+attempts = 0
+while len(cities_locations) < N_CITIES and attempts < max_attempts:
+    attempts += 1
+    x = random.randint(NODE_RADIUS + PLOT_X_OFFSET, WIDTH - NODE_RADIUS)
+    y = random.randint(NODE_RADIUS, HEIGHT - NODE_RADIUS)
+    pt = (x, y)
+    # verificar distância mínima
+    ok = True
+    for ex in cities_locations:
+        dx = ex[0] - x
+        dy = ex[1] - y
+        if (dx*dx + dy*dy) ** 0.5 < MIN_CITY_DISTANCE:
+            ok = False
+            break
+    if ok:
+        cities_locations.append(pt)
 
+# Se não foi possível preencher por causa do espaço, preencher sem restrição
+if len(cities_locations) < N_CITIES:
+    for _ in range(len(cities_locations), N_CITIES):
+        cities_locations.append((
+            random.randint(NODE_RADIUS + PLOT_X_OFFSET, WIDTH - NODE_RADIUS),
+            random.randint(NODE_RADIUS, HEIGHT - NODE_RADIUS)
+        ))
 
-# # # Using Deault Problems: 10, 12 or 15
-# WIDTH, HEIGHT = 800, 400
-# cities_locations = default_problems[15]
-
-
-# Using att48 benchmark
-WIDTH, HEIGHT = 1500, 800
-att_cities_locations = np.array(att_48_cities_locations)
-max_x = max(point[0] for point in att_cities_locations)
-max_y = max(point[1] for point in att_cities_locations)
-scale_x = (WIDTH - PLOT_X_OFFSET - NODE_RADIUS) / max_x
-scale_y = HEIGHT / max_y
-cities_locations = [(int(point[0] * scale_x + PLOT_X_OFFSET),
-                     int(point[1] * scale_y)) for point in att_cities_locations]
-target_solution = [cities_locations[i-1] for i in att_48_cities_order]
+# Cria uma ordem alvo aleatória (permutações dos índices das cidades)
+target_order = list(range(len(cities_locations)))
+random.shuffle(target_order)
+target_solution = [cities_locations[i] for i in target_order]
 fitness_target_solution = calculate_fitness(target_solution)
-print(f"Best Solution: {fitness_target_solution}")
-# ----- Using att48 benchmark
+print(f"Best Solution (random target): {fitness_target_solution}")
 
 
 # Initialize Pygame
@@ -143,6 +158,51 @@ while running:
 
 
 # TODO: save the best individual in a file if it is better than the one saved.
+
+# Antes de sair, salvar uma imagem PNG da melhor rota encontrada
+try:
+    if best_fitness_values and best_solutions:
+        best_idx = int(np.argmin(best_fitness_values))
+        best_route = best_solutions[best_idx]
+        # criar surfaces: mapa (rota) e plot (fitness)
+        map_surf = pygame.Surface((WIDTH - PLOT_X_OFFSET, HEIGHT))
+        map_surf.fill(WHITE)
+        # desenhar cidades e rota no mapa
+        # ajustar coordenadas se cities_locations usam offset PLOT_X_OFFSET
+        draw_cities(map_surf, [(x - PLOT_X_OFFSET, y)
+                    for (x, y) in cities_locations], RED, NODE_RADIUS)
+        # desenhar rota ajustando as coordenadas
+        adjusted_route = [(x - PLOT_X_OFFSET, y) for (x, y) in best_route]
+        draw_paths(map_surf, adjusted_route, BLUE, width=3)
+
+        # criar surface do plot (usar draw_plot que desenha diretamente em uma surface do tamanho do plot)
+        plot_width = PLOT_X_OFFSET
+        plot_height = HEIGHT
+        plot_surf = pygame.Surface((plot_width, plot_height))
+        plot_surf.fill(WHITE)
+        try:
+            # draw_plot espera uma surface do pygame e desenha o gráfico nela
+            draw_plot(plot_surf, list(range(len(best_fitness_values))),
+                      best_fitness_values, y_label="Fitness - Distance (pxls)")
+        except Exception:
+            # fallback: deixar plot_surf em branco
+            pass
+
+        # combinar plot_surf (à esquerda) e map_surf (à direita)
+        final_surf = pygame.Surface(
+            (plot_width + map_surf.get_width(), HEIGHT))
+        final_surf.fill(WHITE)
+        final_surf.blit(plot_surf, (0, 0))
+        final_surf.blit(map_surf, (plot_width, 0))
+
+        image_path = "best_route.png"
+        try:
+            pygame.image.save(final_surf, image_path)
+            print(f"Best route image saved to {image_path}")
+        except Exception as e:
+            print("Falha ao salvar imagem da melhor rota:", e)
+except Exception as e:
+    print("Erro ao gerar imagem da melhor rota:", e)
 
 # exit software
 pygame.quit()

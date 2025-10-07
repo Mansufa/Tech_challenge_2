@@ -214,22 +214,36 @@ def order_crossover(parent1: List[Tuple[float, float]], parent2: List[Tuple[floa
     """
     length = len(parent1)
 
-    # Choose two random indices for the crossover
-    start_index = random.randint(0, length - 1)
+    # Choose two random indices for the crossover (ensure start < end)
+    start_index = random.randint(0, length - 2)
     end_index = random.randint(start_index + 1, length)
 
-    # Initialize the child with a copy of the substring from parent1
-    child = parent1[start_index:end_index]
+    # Prepare an empty child filled with None
+    child: List[Tuple[float, float] | None] = [None] * length
 
-    # Fill in the remaining positions with genes from parent2
-    remaining_positions = [i for i in range(
-        length) if i < start_index or i >= end_index]
-    remaining_genes = [gene for gene in parent2 if gene not in child]
+    # Copy the segment from parent1 and invert only that segment
+    segment = parent1[start_index:end_index]
+    inverted_segment = list(reversed(segment))
+    child[start_index:end_index] = inverted_segment
 
-    for position, gene in zip(remaining_positions, remaining_genes):
-        child.insert(position, gene)
+    # Fill the remaining positions with genes from parent2 in order
+    remaining_genes = [
+        gene for gene in parent2 if gene not in inverted_segment]
+    rem_idx = 0
+    for i in range(length):
+        if child[i] is None:
+            if rem_idx < len(remaining_genes):
+                child[i] = remaining_genes[rem_idx]
+                rem_idx += 1
+            else:
+                # Should not happen, but safety: fill with a random remaining gene
+                for gene in parent1:
+                    if gene not in child:
+                        child[i] = gene
+                        break
 
-    return child
+    # Type ignore: child contains no Nones at this point
+    return [c for c in child]  # type: ignore
 
 # demonstration: crossover test code
 # Example usage:
