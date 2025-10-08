@@ -3,7 +3,7 @@ from pygame.locals import *
 import random
 import itertools
 from genetic_algorithm import mutate, order_crossover, generate_random_population, calculate_fitness, sort_population, default_problems
-from draw_functions import draw_paths, draw_plot, draw_cities
+from draw_functions import draw_paths, draw_plot, draw_cities, draw_text
 import time
 import csv
 import json
@@ -201,6 +201,59 @@ try:
             print(f"Best route image saved to {image_path}")
         except Exception as e:
             print("Falha ao salvar imagem da melhor rota:", e)
+        # --- Salvar imagens dos top-5 resultados (plot + mapa) ---
+        try:
+            # Construir lista de resultados (fitness, generation, route) a partir dos históricos
+            results = []
+            for idx, fit in enumerate(best_fitness_values):
+                sol = best_solutions[idx]
+                gen = idx + 1
+                results.append((fit, gen, sol))
+
+            results_sorted = sorted(results, key=lambda x: x[0])
+            top5 = results_sorted[:5]
+
+            for rank, (fitness, generation, route) in enumerate(top5, start=1):
+                # criar mapa da rota
+                map_width = WIDTH - PLOT_X_OFFSET
+                map_surf2 = pygame.Surface((map_width, HEIGHT))
+                map_surf2.fill(WHITE)
+                # desenhar cidades e rota (ajustando X pelo offset)
+                draw_cities(map_surf2, [(x - PLOT_X_OFFSET, y) for (x, y) in cities_locations], RED, NODE_RADIUS)
+                adjusted_route2 = [(x - PLOT_X_OFFSET, y) for (x, y) in route]
+                draw_paths(map_surf2, adjusted_route2, BLUE, width=3)
+
+                # criar plot
+                plot_w = PLOT_X_OFFSET
+                plot_h = HEIGHT
+                plot_surf2 = pygame.Surface((plot_w, plot_h))
+                plot_surf2.fill(WHITE)
+                try:
+                    draw_plot(plot_surf2, list(range(len(best_fitness_values))), best_fitness_values, y_label="Fitness - Distance (pxls)")
+                except Exception:
+                    pass
+
+                # combinar e anotar com texto
+                combined = pygame.Surface((plot_w + map_width, HEIGHT))
+                combined.fill(WHITE)
+                combined.blit(plot_surf2, (0, 0))
+                combined.blit(map_surf2, (plot_w, 0))
+
+                # desenhar texto descritivo
+                try:
+                    txt = f"Rank {rank} - Gen {generation} - Fitness {round(fitness,6)}"
+                    draw_text(combined, txt, BLACK, position=(10, 10))
+                except Exception:
+                    pass
+
+                out_path = f"top{rank}_route.png"
+                try:
+                    pygame.image.save(combined, out_path)
+                    print(f"Saved top-{rank} image: {out_path}")
+                except Exception as e:
+                    print(f"Failed to save top-{rank} image:", e)
+        except Exception as e:
+            print("Erro ao salvar imagens top-5:", e)
 except Exception as e:
     print("Erro ao gerar imagem da melhor rota:", e)
 
@@ -215,11 +268,11 @@ try:
         gen = idx + 1
         results.append((fit, gen, sol))
 
-    # sort by fitness (ascending) and take top 50
+    # sort by fitness (ascending) and take top 20
     results_sorted = sorted(results, key=lambda x: x[0])
-    top_k = results_sorted[:50]
+    top_k = results_sorted[:20]
 
-    csv_path = "top50_results.csv"
+    csv_path = "top20_results.csv"
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["rank", "generation", "fitness", "route_json"])
@@ -233,7 +286,7 @@ except Exception as e:
 
 # Also write a structured JSON with the top 50 results
 try:
-    json_path = "top50_results.json"
+    json_path = "top20_results.json"
     json_list = []
     for rank, (fitness, generation, route) in enumerate(top_k, start=1):
         json_list.append({
@@ -267,9 +320,9 @@ try:
 
     # sort by fitness (ascending) and take top 50
     results_sorted = sorted(results, key=lambda x: x[0])
-    top_k = results_sorted[:50]
+    top_k = results_sorted[:20]
 
-    csv_path = "top50_results.csv"
+    csv_path = "top20_results.csv"
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["rank", "generation", "fitness", "route_json"])
