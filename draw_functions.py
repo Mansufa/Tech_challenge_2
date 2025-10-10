@@ -84,7 +84,15 @@ def draw_cities(screen: pygame.Surface, cities_locations: List[Tuple[int, int]],
     None
     """
     for city_location in cities_locations:
-        pygame.draw.circle(screen, rgb_color, city_location, node_radius)
+        # Draw an outer black border slightly larger than the node, then the filled circle
+        try:
+            outline_radius = max(1, node_radius + 3)
+            pygame.draw.circle(screen, (0, 0, 0),
+                               city_location, outline_radius)
+            pygame.draw.circle(screen, rgb_color, city_location, node_radius)
+        except Exception:
+            # fallback to simple draw if something goes wrong
+            pygame.draw.circle(screen, rgb_color, city_location, node_radius)
 
 
 def draw_paths(screen: pygame.Surface, path: List[Tuple[int, int]], rgb_color: Tuple[int, int, int], width: int = 1):

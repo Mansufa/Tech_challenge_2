@@ -47,36 +47,12 @@ def calculate_fitness(
     priorities: List[float] = None,
     demands: List[float] = None,
     vehicle_count: int = 1,
-    capacity: float = float("inf"),
-    max_distance: float = float("inf"),
+    capacity: float = 10,
+    max_distance: float = 1000,
     depot: Tuple[float, float] = (0.0, 0.0),
     return_routes: bool = False,
 ) -> float:
-    """
-    Calculate a fitness for a route permutation that supports a simple capacitated
-    multi-vehicle routing formulation with priorities and maximum route distance.
 
-    Behaviour & assumptions (reasonable defaults applied when arguments omitted):
-    - `path` is a permutation (list) of city coordinates (x, y).
-    - `priorities` is a list of same length as `path` with higher numbers meaning
-      more important customers. If None, all priorities are treated as 1.0.
-    - `demands` is a list of same length as `path` describing demand/load per city.
-      If None, all demands are treated as 1.0.
-    - `vehicle_count` number of vehicles available to serve cities in the order
-      they appear in `path`. A simple greedy assignment fills vehicles in sequence.
-    - `capacity` per-vehicle capacity. If a single city's demand > capacity the
-      city will be assigned but a large penalty is applied.
-    - `max_distance` is the maximum allowed route distance per vehicle. If exceeded
-      a penalty is applied. Distances include travel from and back to `depot`.
-    - `depot` is the vehicle depot coordinates (default (0,0)).
-    - By default the function returns a single float (lower is better). If
-      `return_routes=True` the function returns a tuple (fitness, routes) where
-      `routes` is a list of lists of city indices assigned to each vehicle.
-
-    The fitness is computed as: total_distance + big_penalty * (priority-weighted
-    sum of unassigned or severely violated demands) . The design keeps the
-    function backward-compatible with existing code that expects a float.
-    """
     n = len(path)
 
     # Default priorities and demands
