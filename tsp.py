@@ -15,10 +15,12 @@ import argparse
 
 # Define constant values
 # pygame
-WIDTH, HEIGHT = 800, 400
+WIDTH, HEIGHT = 1000, 500
 NODE_RADIUS = 10
 FPS = 30
 PLOT_X_OFFSET = 450
+LEGEND_WIDTH = 150
+MAP_X_OFFSET = PLOT_X_OFFSET + LEGEND_WIDTH
 
 # GA
 N_CITIES = 15
@@ -90,7 +92,7 @@ max_attempts = 1000
 attempts = 0
 while len(cities_locations) < N_CITIES and attempts < max_attempts:
     attempts += 1
-    x = random.randint(NODE_RADIUS + PLOT_X_OFFSET, WIDTH - NODE_RADIUS)
+    x = random.randint(NODE_RADIUS + MAP_X_OFFSET, WIDTH - NODE_RADIUS)
     y = random.randint(NODE_RADIUS, HEIGHT - NODE_RADIUS)
     pt = (x, y)
     # verificar distância mínima
@@ -108,7 +110,7 @@ while len(cities_locations) < N_CITIES and attempts < max_attempts:
 if len(cities_locations) < N_CITIES:
     for _ in range(len(cities_locations), N_CITIES):
         cities_locations.append((
-            random.randint(NODE_RADIUS + PLOT_X_OFFSET, WIDTH - NODE_RADIUS),
+            random.randint(NODE_RADIUS + MAP_X_OFFSET, WIDTH - NODE_RADIUS),
             random.randint(NODE_RADIUS, HEIGHT - NODE_RADIUS)
         ))
 
@@ -118,7 +120,7 @@ if cities_locations:
     depot = cities_locations.pop(0)
 else:
     # fallback: se por alguma razão não há cidades, criar um depot no centro
-    depot = (PLOT_X_OFFSET + (WIDTH - PLOT_X_OFFSET) // 2, HEIGHT // 2)
+    depot = (MAP_X_OFFSET + (WIDTH - MAP_X_OFFSET) // 2, HEIGHT // 2)
 
 # Cria uma ordem alvo aleatória (permutações dos índices das cidades)
 target_order = list(range(len(cities_locations)))
@@ -299,8 +301,13 @@ while running:
     best_fitness_values.append(best_fitness)
     best_solutions.append(best_solution)
 
-    draw_plot(screen, list(range(len(best_fitness_values))),
+    # Create a temporary surface for the plot content (400x400 from matplotlib figsize)
+    plot_content_surf = pygame.Surface((400, 400))
+    plot_content_surf.fill(WHITE)
+    draw_plot(plot_content_surf, list(range(len(best_fitness_values))),
               best_fitness_values, y_label="Fitness - Distance (pxls)")
+    # Blit the plot content onto the main screen, centered within its allocated area
+    screen.blit(plot_content_surf, ((PLOT_X_OFFSET - 400) // 2, (HEIGHT - 400) // 2))
 
     # Desenhar depot (origem) e demais cidades (cities_locations contém apenas cidades, sem o depot)
     try:
@@ -332,9 +339,9 @@ while running:
                 box_size = 16
                 include_depot = True
                 total_h = entries * (box_size + 6) + \
-                    (box_size + 6 if include_depot else 0)
-                legend_x = PLOT_X_OFFSET + 10
-                legend_y = HEIGHT - total_h - 30
+                    (box_size + 6 if include_depot else 0) # Altura total da legenda
+                legend_x = PLOT_X_OFFSET + 10 # Posição X (depois do gráfico)
+                legend_y = HEIGHT - total_h - 10 # Posiciona na parte inferior da tela
                 draw_legend(screen, VEHICLE_COUNT, (legend_x, legend_y),
                             font_size=14, box_size=box_size, include_depot=include_depot)
             except Exception:
@@ -382,12 +389,12 @@ try:
     if best_fitness_values and best_solutions:
         best_idx = int(np.argmin(best_fitness_values))
         best_route = best_solutions[best_idx]
-        # criar surfaces: mapa (rota) e plot (fitness)
-        map_surf = pygame.Surface((WIDTH - PLOT_X_OFFSET, HEIGHT))
+        # criar surfaces: mapa (rota) e plot (fitness) - mapa agora tem largura diferente
+        map_surf = pygame.Surface((WIDTH - MAP_X_OFFSET, HEIGHT))
         map_surf.fill(WHITE)
         # desenhar depot e cidades no mapa (map_surf usa coordenadas sem o offset)
-        depot_map = (depot[0] - PLOT_X_OFFSET, depot[1])
-        draw_cities(map_surf, [depot_map], PURPLE, NODE_RADIUS + 2)
+        depot_map = (depot[0] - MAP_X_OFFSET, depot[1])
+        pygame.draw.circle(map_surf, PURPLE, depot_map, NODE_RADIUS + 2)
         draw_cities(map_surf, [(x - PLOT_X_OFFSET, y)
                     for (x, y) in cities_locations], (140, 140, 140), NODE_RADIUS)
         # desenhar rotas por veículo e markers no mapa salvo
@@ -396,17 +403,17 @@ try:
                 best_route, depot=depot, vehicle_count=VEHICLE_COUNT, capacity=CAPACITY, max_distance=MAX_DISTANCE, priorities=[PRIORITY]*len(best_route), return_routes=True)
             for v_idx, route_indices in enumerate(best_routes):
                 color = get_route_color(v_idx)
-                coords = [depot_map] + [(best_route[i][0] - PLOT_X_OFFSET, best_route[i][1])
+                coords = [depot_map] + [(best_route[i][0] - MAP_X_OFFSET, best_route[i][1])
                                         for i in route_indices] + [depot_map]
                 draw_paths(map_surf, coords, color,
                            width=3 if v_idx == 0 else 2)
                 for order_idx, city_idx in enumerate(route_indices, start=1):
                     c = best_route[city_idx]
-                    draw_marker(map_surf, (c[0] - PLOT_X_OFFSET, c[1]),
+                    draw_marker(map_surf, (c[0] - MAP_X_OFFSET, c[1]),
                                 str(order_idx), color, radius=10, font_size=14)
             # legenda na surface do plot será desenhada depois na final_surf
         except Exception:
-            adjusted_route = [depot_map] + [(x - PLOT_X_OFFSET, y)
+            adjusted_route = [depot_map] + [(x - MAP_X_OFFSET, y)
                                             for (x, y) in best_route] + [depot_map]
             draw_paths(map_surf, adjusted_route, BLUE, width=3)
 
@@ -415,30 +422,33 @@ try:
         plot_height = HEIGHT
         plot_surf = pygame.Surface((plot_width, plot_height))
         plot_surf.fill(WHITE)
+        # Create a temporary surface for the plot content (400x400 from matplotlib figsize)
+        plot_content_surf_save = pygame.Surface((400, 400))
+        plot_content_surf_save.fill(WHITE)
         try:
-            # draw_plot espera uma surface do pygame e desenha o gráfico nela
-            draw_plot(plot_surf, list(range(len(best_fitness_values))),
+            draw_plot(plot_content_surf_save, list(range(len(best_fitness_values))),
                       best_fitness_values, y_label="Fitness - Distance (pxls)")
         except Exception:
             # fallback: deixar plot_surf em branco
             pass
+        # Blit the plot content onto plot_surf, centered within its allocated area
+        plot_surf.blit(plot_content_surf_save, ((plot_width - 400) // 2, (plot_height - 400) // 2))
 
         # combinar plot_surf (à esquerda) e map_surf (à direita)
         final_surf = pygame.Surface(
             (plot_width + map_surf.get_width(), HEIGHT))
         final_surf.fill(WHITE)
         final_surf.blit(plot_surf, (0, 0))
-        final_surf.blit(map_surf, (plot_width, 0))
+        final_surf.blit(map_surf, (MAP_X_OFFSET, 0))
         # desenhar legenda na combined antes de salvar
         try:
             # place legend below the map area inside the combined final surface
             entries = min(VEHICLE_COUNT, len(ROUTE_COLORS))
             box_size = 18
             include_depot = True
-            total_h = entries * (box_size + 6) + \
-                (box_size + 6 if include_depot else 0)
-            legend_x = plot_width + 10
-            legend_y = HEIGHT - total_h - 10
+            total_h = entries * (box_size + 6) + (box_size + 6 if include_depot else 0)
+            legend_x = PLOT_X_OFFSET + 10 # Posição X (depois do gráfico)
+            legend_y = HEIGHT - total_h - 10 # Posiciona na parte inferior da tela
             draw_legend(final_surf, VEHICLE_COUNT, (legend_x, legend_y),
                         font_size=16, box_size=box_size, include_depot=include_depot)
         except Exception:
@@ -464,29 +474,28 @@ try:
 
             for rank, (fitness, generation, route) in enumerate(top5, start=1):
                 # criar mapa da rota
-                map_width = WIDTH - PLOT_X_OFFSET
+                map_width = WIDTH - MAP_X_OFFSET
                 map_surf2 = pygame.Surface((map_width, HEIGHT))
                 map_surf2.fill(WHITE)
                 # desenhar depot e cidades no mapa do top-K
-                depot_map2 = (depot[0] - PLOT_X_OFFSET, depot[1])
-                draw_cities(map_surf2, [depot_map2], PURPLE, NODE_RADIUS + 2)
-                draw_cities(map_surf2, [(x - PLOT_X_OFFSET, y)
+                depot_map2 = (depot[0] - MAP_X_OFFSET, depot[1])
+                pygame.draw.circle(map_surf2, PURPLE, depot_map2, NODE_RADIUS + 2)
+                draw_cities(map_surf2, [(x - MAP_X_OFFSET, y)
                             for (x, y) in cities_locations], (140, 140, 140), NODE_RADIUS)
                 try:
                     _, routes_k = calculate_fitness(
                         route, depot=depot, vehicle_count=VEHICLE_COUNT, capacity=CAPACITY, max_distance=MAX_DISTANCE, priorities=[PRIORITY]*len(route), return_routes=True)
                     for v_idx, r_inds in enumerate(routes_k):
                         color_k = get_route_color(v_idx)
-                        coords_k = [
-                            depot_map2] + [(route[i][0] - PLOT_X_OFFSET, route[i][1]) for i in r_inds] + [depot_map2]
+                        coords_k = [depot_map2] + [(route[i][0] - MAP_X_OFFSET, route[i][1]) for i in r_inds] + [depot_map2]
                         draw_paths(map_surf2, coords_k, color_k, width=2)
                         for order_idx, city_idx in enumerate(r_inds, start=1):
                             c = route[city_idx]
                             draw_marker(
-                                map_surf2, (c[0] - PLOT_X_OFFSET, c[1]), str(order_idx), color_k, radius=10, font_size=14)
+                                map_surf2, (c[0] - MAP_X_OFFSET, c[1]), str(order_idx), color_k, radius=10, font_size=14)
                 except Exception:
                     adjusted_route2 = [
-                        depot_map2] + [(x - PLOT_X_OFFSET, y) for (x, y) in route] + [depot_map2]
+                        depot_map2] + [(x - MAP_X_OFFSET, y) for (x, y) in route] + [depot_map2]
                     draw_paths(map_surf2, adjusted_route2, BLUE, width=3)
 
                 # criar plot
@@ -495,16 +504,21 @@ try:
                 plot_surf2 = pygame.Surface((plot_w, plot_h))
                 plot_surf2.fill(WHITE)
                 try:
-                    draw_plot(plot_surf2, list(range(len(best_fitness_values))),
+                    # Create a temporary surface for the plot content (400x400 from matplotlib figsize)
+                    plot_content_surf_topk = pygame.Surface((400, 400))
+                    plot_content_surf_topk.fill(WHITE)
+                    draw_plot(plot_content_surf_topk, list(range(len(best_fitness_values))),
                               best_fitness_values, y_label="Fitness - Distance (pxls)")
                 except Exception:
                     pass
+                # Blit the plot content onto plot_surf2, centered within its allocated area
+                plot_surf2.blit(plot_content_surf_topk, ((plot_w - 400) // 2, (plot_h - 400) // 2))
 
                 # combinar e anotar com texto
                 combined = pygame.Surface((plot_w + map_width, HEIGHT))
                 combined.fill(WHITE)
                 combined.blit(plot_surf2, (0, 0))
-                combined.blit(map_surf2, (plot_w, 0))
+                combined.blit(map_surf2, (MAP_X_OFFSET, 0))
 
                 # desenhar texto descritivo
                 try:
@@ -521,8 +535,8 @@ try:
                     include_depot_k = True
                     total_h_k = entries_k * \
                         (box_k + 6) + (box_k + 6 if include_depot_k else 0)
-                    legend_x_k = plot_w + 10
-                    legend_y_k = HEIGHT - total_h_k - 10
+                    legend_x_k = PLOT_X_OFFSET + 10 # Posição X (depois do gráfico)
+                    legend_y_k = HEIGHT - total_h_k - 10 # Posiciona na parte inferior da tela
                     draw_legend(combined, VEHICLE_COUNT, (legend_x_k, legend_y_k),
                                 font_size=14, box_size=box_k, include_depot=include_depot_k)
                 except Exception:
