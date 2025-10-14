@@ -89,52 +89,80 @@ This repository contains a Python implementation of a Traveling Salesman Problem
 Execute the following command in your terminal to run the program:
 
 ### Pygame
-```bash
-python tps.py
+# Otimização de Rotas Médicas — Algoritmo Genético (Python)
+
+Este repositório implementa um sistema de otimização de rotas para entregas médicas usando um Algoritmo Genético (AG) com visualização em tempo de execução via Pygame.
+
+![visualização](image.png)
+
+## Visão geral
+O objetivo é gerar rotas para uma frota de veículos que atendam entregas com diferentes prioridades (CRITICAL, HIGH, MEDIUM, LOW). O sistema permite configurar número de cidades, número de veículos e tempo máximo de execução via uma janela Pygame ao iniciar o programa.
+
+Durante a execução o algoritmo evolui uma população de soluções e, ao final, salva as melhores soluções (PNG com mapa/rotas e CSV com rotas por veículo) em `src/images/`.
+
+## Arquivos principais
+- `main.py` — orquestra execução e UI (entrada via Pygame), loop do AG, desenho em tela e salvamento de artefatos (PNG/CSV).
+- `population.py` — geração de população, cálculo de fitness, divisão de entregas entre veículos e otimizações locais (inclui garantia de prioridade nas rotas).
+- `models.py` — modelos de dados (Delivery, Priority).
+- `visualization.py` — funções de desenho e `draw_legend` (legenda é adicionada apenas nas imagens salvas).
+- `config.py` — parâmetros e constantes do experimento.
+
+## Saída gerada
+- PNGs com as melhores soluções: `src/images/top_1.png` … `top_5.png`
+- CSVs com rotas detalhadas por veículo: `src/images/top_1.csv` … `top_5.csv`
+- Relatório técnico (MD e PDF): `REPORT_FASE2.md`, `REPORT_FASE2.pdf` (adicionados no branch)
+
+Exemplo (trecho de `src/images/top_1.csv`):
+
 ```
-> Press the 'q' key to quit the program.
-
-
-
-## Overview
-
-The TSP solver employs a Genetic Algorithm to iteratively evolve a population of candidate solutions towards an optimal or near-optimal solution. The GA operates by mimicking the process of natural selection, where individuals with higher fitness (i.e., shorter route distance) are more likely to survive and produce offspring.
-
-## Files
-
-- **genetic_algorithm.py**: Contains the implementation of the Genetic Algorithm, including functions for generating random populations, calculating fitness, performing crossover and mutation operations, and sorting populations based on fitness.
-- **tsp.py**: Implements the main TSP solver using Pygame for visualization. It initializes the problem, creates the initial population, and iteratively evolves the population while visualizing the best solution found so far.
-- **draw_functions.py**: Provides functions for drawing cities, paths, and plots using Pygame.
-
-## Usage
-
-To run the TSP solver, execute the `tsp.py` script using Python. The solver allows you to choose between different problem instances:
-
-- Randomly generated cities
-- Default predefined problems with 10, 12, or 15 cities
-- `att48` benchmark dataset (uncomment relevant code in `tsp.py`)
-
-You can customize parameters such as population size, number of generations, and mutation probability directly in the `tsp.py` script.
-
-## Dependencies
-
-- Python 3.x
-- Pygame (for visualization)
-
-Ensure Pygame is installed before running the solver. You can install Pygame using pip:
-
-```bash
-pip install pygame
+SolutionRank,Fitness,VehicleID,DeliveryIDs,NumDeliveries,TotalWeight,Distance,Priorities
+1,3489.46,1,4;0;1,3,48.36,679.5953541816605,CRITICAL;LOW;LOW
 ```
 
-## Acknowledgments
+## Como executar
+1. Ative o ambiente virtual (Windows):
 
-This TSP solver was developed as a learning project and draws inspiration from various online resources and academic materials on Genetic Algorithms and the Traveling Salesman Problem. Special thanks to the authors of those resources for sharing their knowledge.
+```bash
+.venv\Scripts\activate
+```
 
-## License
+2. Instale dependências (se necessário):
 
-This project is licensed under the [MIT License](LICENSE).
+```bash
+pip install -r requirements.txt
+# ou instale individualmente: pip install pygame numpy matplotlib reportlab Pillow
+```
+
+3. Execute o programa principal:
+
+```bash
+python main.py
+```
+
+Ao abrir, a janela do Pygame pedirá: número de cidades, número de veículos e tempo de execução (segundos). Pressione Enter para aceitar o padrão.
+
+## Relatório e documentação
+O relatório da Fase 2 foi gerado e está disponível em `REPORT_FASE2.md` e `REPORT_FASE2.pdf`. Ele contém detalhes da implementação, resultados (imagens e CSVs) e recomendações para próximos passos.
+
+## Dependências
+- Python 3.10+ (testado com 3.13)
+- numpy
+- pygame
+- matplotlib
+- reportlab, Pillow (para geração de PDF)
+
+Use `environment.yml` ou `requirements.txt` (se presente) para criar o ambiente.
+
+## Observações e próximos passos
+- As imagens e CSVs foram adicionadas ao repositório para facilitar revisão; se preferir, movemos `src/images/` para `.gitignore` para evitar poluição do histórico.
+- Próximos passos recomendados:
+  - Adicionar testes unitários para funções centrais (`population.py`).
+  - Implementar heurísticas locais adicionais (2-opt) preservando priorização.
+  - Gerar um CSV mestre agregando as 5 melhores soluções.
+
+## Licença
+MIT — veja `LICENSE`.
 
 ---
 
-Feel free to contribute to this repository by providing enhancements, bug fixes, or additional features. If you encounter any issues or have suggestions for improvements, please open an issue on the repository. Happy solving!
+Se quiser que eu: (A) remova as imagens do controle de versão; (B) gere um release com o PDF; ou (C) adicione instruções de execução mais detalhadas (ex.: exemplos de parâmetros), me diga qual opção prefere.
