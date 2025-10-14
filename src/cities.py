@@ -107,3 +107,17 @@ def generate_vehicle_capacities(total_weight: float, num_vehicles: int, margin: 
         capacities.append(round(vehicle_capacity, 1))
 
     return capacities
+
+
+def generate_vehicle_max_deliveries(num_deliveries: int, num_vehicles: int) -> List[int]:
+    """Distribui o número total de entregas de forma aleatória entre os veículos."""
+    # Garante que pelo menos 1 entrega por veículo
+    max_deliveries = [1] * num_vehicles
+    remaining = num_deliveries - num_vehicles
+
+    for _ in range(remaining):
+        # Escolhe um veículo aleatório para receber mais uma entrega
+        vehicle_idx = random.randint(0, num_vehicles - 1)
+        max_deliveries[vehicle_idx] += 1
+
+    return max_deliveries

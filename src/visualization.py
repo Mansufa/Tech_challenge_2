@@ -6,7 +6,7 @@ import numpy as np
 import pygame
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 
-from config import GREEN, PRIORITY_COLORS, RED, VEHICLE_COLORS
+from config import GREEN, PRIORITY_COLORS, RED, VEHICLE_COLORS, NUM_VEHICLES
 from models import Delivery, Priority
 
 matplotlib.use("Agg")
@@ -29,6 +29,7 @@ def draw_plot(
     y_values: List[float],
     x_label: str = "Geração",
     y_label: str = "Distância (px)",
+    save_path: str | None = None,
 ):
     if len(y_values) < 2:
         return
@@ -38,9 +39,19 @@ def draw_plot(
     ax.plot(x_values, y_values, color="#1f77b4", linewidth=2)
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
-    ax.set_title("Evolução do Fitness")
+    # Ajusta título com padding para criar margem entre o título e o gráfico
+    ax.set_title("Evolução do Fitness", pad=14)
     ax.grid(True, alpha=0.3)
-    plt.tight_layout()
+    # Usa tight_layout com um padding maior para evitar cortes
+    plt.tight_layout(pad=2.0)
+
+    # Salva a figura em arquivo se solicitado (antes de extrair dados do canvas)
+    if save_path:
+        try:
+            fig.savefig(save_path, dpi=100)
+        except Exception:
+            # não falha a execução se o salvamento não funcionar
+            pass
 
     # Converte matplotlib para pygame surface
     canvas = FigureCanvasAgg(fig)
@@ -113,8 +124,21 @@ def draw_depot(screen: pygame.Surface, depot: Tuple[int, int], radius: int = 10)
     pygame.draw.circle(screen, (0, 0, 0), depot, radius + 4, 2)  # Borda preta
 
 
-def draw_legend(screen: pygame.Surface, x: int = 450, y: int = 300):
-    font = pygame.font.Font(None, 12)
+def draw_legend(screen: pygame.Surface, x: int | None = None, y: int | None = None):
+    # Torna a legenda responsiva ao tamanho da janela
+    screen_width, screen_height = screen.get_size()
+
+    # Posição padrão no canto inferior direito com margem
+    margin = max(10, int(min(screen_width, screen_height) * 0.02))
+    if x is None:
+        x = screen_width - int(screen_width * 0.45) - margin
+    if y is None:
+        y = margin + 20
+
+    # Fontes escaladas com base na largura da janela
+    base_font_size = max(12, int(screen_width / 80))
+    title_font = pygame.font.Font(None, base_font_size + 4)
+    font = pygame.font.Font(None, base_font_size)
 
     items = [
         (Priority.CRITICAL, "CRÍTICA"),
@@ -124,11 +148,57 @@ def draw_legend(screen: pygame.Surface, x: int = 450, y: int = 300):
         (None, "DEPÓSITO"),
     ]
 
+    # Calcula tamanho estimado da caixa de legenda (duas colunas) responsivo
+    line_height = int(base_font_size * 1.5)
+    left_lines = len(items) + 1
+    right_lines = max(1, NUM_VEHICLES)
+    total_lines = max(left_lines, right_lines)
+    box_height = int((total_lines * line_height) + margin)
+    box_width = int(min(screen_width * 0.48, 420))
+
+    # Desenha retângulo de fundo semi-transparente usando Surface com alpha
+    bg_rect = pygame.Rect(x - 8, y - 8, box_width, box_height)
+    try:
+        overlay = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
+        overlay.fill((250, 250, 250, 220))  # branco levemente translúcido
+        screen.blit(overlay, (bg_rect.x, bg_rect.y))
+        pygame.draw.rect(screen, (160, 160, 160), bg_rect, 1)  # borda
+    except Exception:
+        # fallback sólido se Surface alpha não suportado
+        pygame.draw.rect(screen, (245, 245, 245), bg_rect)
+        pygame.draw.rect(screen, (180, 180, 180), bg_rect, 1)
+
+    # Título da legenda
+    title = title_font.render("Legenda", True, (0, 0, 0))
+    screen.blit(title, (x + 8, y - 6))
+
+    # Coordenadas base para colunas (ajustadas para o tamanho da caixa)
+    left_x = x + 8
+    right_x = x + int(box_width * 0.5) + 8
+
+    # Itens de prioridade (coluna esquerda)
     for i, (priority, label) in enumerate(items):
-        pos_y = y + 5 + (i * 17)
+        pos_y = y + (i * line_height) + 8
         color = GREEN if priority is None else PRIORITY_COLORS.get(priority, RED)
 
-        pygame.draw.circle(screen, color, (x + 10, pos_y + 6), 4)
+        pygame.draw.circle(screen, color, (left_x + 8, pos_y + int(line_height / 2)), int(base_font_size * 0.45))
 
         text = font.render(label, True, (0, 0, 0))
-        screen.blit(text, (x + 20, pos_y))
+        screen.blit(text, (left_x + 26, pos_y))
+
+    # Cabeçalho das rotas/veículos (coluna direita)
+    vehicle_header = font.render("Rotas / Veículos:", True, (0, 0, 0))
+    screen.blit(vehicle_header, (right_x, y + 2))
+
+    # Desenha cada veículo com uma linha colorida e um marcador (coluna direita)
+    for i in range(NUM_VEHICLES):
+        pos_y = y + 18 + (i * line_height)
+        color = VEHICLE_COLORS[i % len(VEHICLE_COLORS)]
+
+        # Linha de exemplo da rota
+        pygame.draw.line(screen, color, (right_x + 6, pos_y + int(line_height / 2)), (right_x + 36, pos_y + int(line_height / 2)), max(2, int(base_font_size / 3)))
+        # Marcador circular no início da linha
+        pygame.draw.circle(screen, color, (right_x + 6, pos_y + int(line_height / 2)), max(3, int(base_font_size / 2)))
+
+        text = font.render(f"Veículo {i+1}", True, (0, 0, 0))
+        screen.blit(text, (right_x + 44, pos_y))

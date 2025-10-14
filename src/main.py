@@ -1,10 +1,11 @@
 import os
 import random
+import time
 
 import numpy as np
 import pygame
 
-from cities import generate_deliveries, generate_vehicle_capacities
+from cities import generate_deliveries, generate_vehicle_capacities, generate_vehicle_max_deliveries
 from config import (
     FLEET_CAPACITY_MARGIN,
     FPS,
@@ -14,7 +15,7 @@ from config import (
     NODE_RADIUS,
     NUM_VEHICLES,
     POPULATION_SIZE,
-    VEHICLE_MAX_DISTANCE,
+    TIME_LIMIT_SECONDS,
     WHITE,
     WIDTH,
 )
@@ -28,7 +29,6 @@ from population import (
 )
 from visualization import draw_deliveries, draw_depot, draw_legend, draw_multiple_routes, draw_plot
 
-
 DEPOT_LOCATION = (500, HEIGHT // 2)
 
 deliveries = generate_deliveries(num_deliveries=N_CITIES)
@@ -39,9 +39,11 @@ total_weight = sum(d.weight for d in deliveries)
 vehicle_capacities = generate_vehicle_capacities(total_weight, NUM_VEHICLES, FLEET_CAPACITY_MARGIN)
 total_capacity = sum(vehicle_capacities)
 
+vehicle_max_deliveries = generate_vehicle_max_deliveries(N_CITIES, NUM_VEHICLES)
+
 print(f"\nVeículos disponíveis: {NUM_VEHICLES}")
-for i, capacity in enumerate(vehicle_capacities, 1):
-    print(f"  V{i}: Capacidade = {capacity:.1f}kg")
+for i, (capacity, max_deliveries) in enumerate(zip(vehicle_capacities, vehicle_max_deliveries, strict=False), 1):
+    print(f"  V{i}: Capacidade = {capacity:.1f}kg, Máx. Entregas = {max_deliveries}")
 
 # Estatísticas das entregas
 priority_counts = dict.fromkeys(Priority, 0)
@@ -57,7 +59,6 @@ print(f"Capacidade total da frota: {total_capacity:.2f}kg")
 print(
     f"Margem de segurança: {total_capacity - total_weight:.2f}kg ({((total_capacity / total_weight - 1) * 100):.1f}%)"
 )
-print(f"Autonomia por veículo: {VEHICLE_MAX_DISTANCE:.0f} unidades")
 
 # Inicializa Pygame
 pygame.init()
@@ -75,8 +76,8 @@ print(f"\nPopulação inicial criada: {POPULATION_SIZE} indivíduos")
 print("Iniciando evolução...\n")
 
 
-running = True
-while running:
+start_time = time.time()
+while (time.time() - start_time) < TIME_LIMIT_SECONDS:
     for event in pygame.event.get():
         if event.type == pygame.QUIT or event.type == pygame.KEYDOWN and event.key == pygame.K_q:
             running = False
@@ -86,7 +87,9 @@ while running:
     screen.fill(WHITE)
 
     population_fitness = [
-        calculate_fitness_multi_vehicle(individual, NUM_VEHICLES, DEPOT_LOCATION, vehicle_capacities)
+        calculate_fitness_multi_vehicle(
+            individual, NUM_VEHICLES, DEPOT_LOCATION, vehicle_capacities, vehicle_max_deliveries
+        )
         for individual in population
     ]
 
@@ -99,7 +102,9 @@ while running:
 
     draw_plot(screen, list(range(1, len(best_fitness_values) + 1)), best_fitness_values)
 
-    best_routes = split_deliveries_by_vehicle(best_solution, NUM_VEHICLES, DEPOT_LOCATION, vehicle_capacities)
+    best_routes = split_deliveries_by_vehicle(
+        best_solution, NUM_VEHICLES, DEPOT_LOCATION, vehicle_capacities, vehicle_max_deliveries
+    )
 
     draw_deliveries(screen, deliveries, NODE_RADIUS)
 
@@ -116,12 +121,13 @@ while running:
 
         # Capacidade específica deste veículo
         vehicle_capacity = vehicle_capacities[vehicle_id - 1]
+        max_deliveries = vehicle_max_deliveries[vehicle_id - 1]
 
         overload = max(0, route_load - vehicle_capacity)
-        exceed_range = max(0, route_distance - VEHICLE_MAX_DISTANCE)
+        exceed_deliveries = max(0, len(route) - max_deliveries)
 
         vehicle_stats = (
-            f"V{vehicle_id}: {len(route)} entregas, {round(route_load, 1)}kg/{round(vehicle_capacity, 1)}kg, "
+            f"V{vehicle_id}: {len(route)}/{max_deliveries} entregas, {round(route_load, 1)}kg/{round(vehicle_capacity, 1)}kg, "
             f"{round(route_distance, 0)}dist"
         )
         stats_lines.append(vehicle_stats)
@@ -152,7 +158,9 @@ while running:
 pygame.quit()
 
 best_route = best_solutions[best_fitness_values.index(min(best_fitness_values))]
-best_vehicle_routes = split_deliveries_by_vehicle(best_route, NUM_VEHICLES, DEPOT_LOCATION, vehicle_capacities)
+best_vehicle_routes = split_deliveries_by_vehicle(
+    best_route, NUM_VEHICLES, DEPOT_LOCATION, vehicle_capacities, vehicle_max_deliveries
+)
 
 print("\n" + "=" * 60)
 print("MELHOR SOLUÇÃO ENCONTRADA")
@@ -166,12 +174,13 @@ for vehicle_id, route in enumerate(best_vehicle_routes, 1):
     route_load = sum(d.weight for d in route)
     route_distance = calculate_route_distance(route, DEPOT_LOCATION)
     vehicle_capacity = vehicle_capacities[vehicle_id - 1]
+    max_deliveries = vehicle_max_deliveries[vehicle_id - 1]
 
     print(f"\nVeículo {vehicle_id}:")
     print(f"  Capacidade do veículo: {vehicle_capacity:.2f}kg")
-    print(f"  Entregas: {len(route)}")
-    print(f"  Carga: {route_load:.2f}kg / {vehicle_capacity:.2f}kg", end="")
-    print(f"  Distância: {route_distance:.0f} / {VEHICLE_MAX_DISTANCE:.0f}", end="")
+    print(f"  Entregas: {len(route)} / {max_deliveries}")
+    print(f"  Carga: {route_load:.2f}kg / {vehicle_capacity:.2f}kg")
+    print(f"  Distância: {route_distance:.0f}")
 
     if route:
         print("  Primeiras entregas:")
@@ -185,6 +194,9 @@ print("=" * 60)
 
 images_dir = os.path.join(os.path.dirname(__file__), "images")
 os.makedirs(images_dir, exist_ok=True)
+
+# Pixels extras adicionados abaixo do mapa nas imagens salvas para colocar a legenda
+SAVE_EXTRA_HEIGHT = 120
 
 # Encontra soluções únicas removendo duplicatas
 unique_solutions = []
@@ -208,27 +220,50 @@ pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
 for rank, (fitness, solution) in enumerate(top_5_solutions, 1):
+    # Atualiza o display para visualização
     screen.fill(WHITE)
 
     # Divide entregas entre veículos
-    vehicle_routes = split_deliveries_by_vehicle(solution, NUM_VEHICLES, DEPOT_LOCATION, vehicle_capacities)
+    vehicle_routes = split_deliveries_by_vehicle(
+        solution, NUM_VEHICLES, DEPOT_LOCATION, vehicle_capacities, vehicle_max_deliveries
+    )
 
-    # Desenha todos os elementos
+    # Desenha no display (tela)
+    draw_plot(screen, list(range(1, len(best_fitness_values) + 1)), best_fitness_values)
     draw_deliveries(screen, deliveries, NODE_RADIUS)
     draw_depot(screen, DEPOT_LOCATION, NODE_RADIUS)
     draw_multiple_routes(screen, vehicle_routes, DEPOT_LOCATION)
     draw_legend(screen)
 
-    # Adiciona texto com informações da solução
+    # Adiciona texto com informações da solução no display
     font = pygame.font.Font(None, 28)
     title_text = font.render(f"Top {rank} - Fitness: {fitness:.2f}", True, (0, 0, 0))
     screen.blit(title_text, (10, 10))
 
     pygame.display.flip()
 
+    # Cria uma superfície maior para salvar a imagem sem sobreposição da legenda
+    save_surface = pygame.Surface((WIDTH, HEIGHT + SAVE_EXTRA_HEIGHT))
+    save_surface.fill(WHITE)
+
+    # Desenha o mapa/rotas na parte superior da imagem salva
+    draw_plot(save_surface, list(range(1, len(best_fitness_values) + 1)), best_fitness_values)
+    draw_deliveries(save_surface, deliveries, NODE_RADIUS)
+    draw_depot(save_surface, DEPOT_LOCATION, NODE_RADIUS)
+    draw_multiple_routes(save_surface, vehicle_routes, DEPOT_LOCATION)
+
+    # Desenha a legenda deslocada para a área extra (abaixo do mapa)
+    legend_y = HEIGHT + 10
+    draw_legend(save_surface, x=20, y=legend_y)
+
+    # Adiciona título na imagem salva
+    font2 = pygame.font.Font(None, 28)
+    title_text2 = font2.render(f"Top {rank} - Fitness: {fitness:.2f}", True, (0, 0, 0))
+    save_surface.blit(title_text2, (10, 10))
+
     filename = f"top_{rank}.png"
     filepath = os.path.join(images_dir, filename)
-    pygame.image.save(screen, filepath)
+    pygame.image.save(save_surface, filepath)
 
     print(f"✓ Salva: {filename} - Fitness: {fitness:.2f}")
 

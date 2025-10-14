@@ -11,14 +11,11 @@ MARGIN = 30
 N_CITIES = 15
 POPULATION_SIZE = 100
 N_GENERATIONS = 1000
-TIME_LIMIT_SECONDS = 10  # 2 minutes
+TIME_LIMIT_SECONDS = 10  # 10 segundos
 MUTATION_PROBABILITY = 0.5
 
 #  ============= VRP constant values ====================
-# Parâmetros de veículos
 NUM_VEHICLES = 3  # Número de veículos disponíveis
-# Nota: Capacidades serão geradas dinamicamente baseadas no peso total dos medicamentos
-VEHICLE_MAX_DISTANCE = 3000.0  # Autonomia máxima de cada veículo (distância máxima)
 
 # Parâmetros de entregas
 MIN_DELIVERY_WEIGHT = 5.0  # Peso mínimo de uma entrega em kg
@@ -27,23 +24,16 @@ MAX_DELIVERY_WEIGHT = 25.0  # Peso máximo de uma entrega em kg
 # Penalidades para função fitness
 PENALTY_OVERLOAD = 1000.0  # Penalidade por exceder capacidade
 PENALTY_PRIORITY = 50.0  # Penalidade base por atraso de prioridade
-PENALTY_EXCEEDS_RANGE = 2000.0  # Penalidade por exceder autonomia do veículo
 
 # Margem de capacidade extra da frota (10% a mais que o peso total)
 FLEET_CAPACITY_MARGIN = 1.1
-
-# Pesos da função fitness (soma deve ser 1.0)
-WEIGHT_DISTANCE = 0.4  # Peso da distância total
-WEIGHT_PRIORITY = 0.3  # Peso das penalidades de prioridade
-WEIGHT_CAPACITY = 0.15  # Peso das penalidades de capacidade
-WEIGHT_RANGE = 0.15  # Peso das penalidades de autonomia
 
 # ============= colors ===========================
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 BLUE = (0, 0, 255)
-GREEN = (0, 255, 0)  # Cor para cidade inicial/final
+GREEN = (0, 187, 119)  # Cor para cidade inicial/final
 GRAY = (128, 128, 128)
 
 # Cores para prioridades
@@ -57,8 +47,8 @@ PRIORITY_COLORS = {
 # Cores para veículos (rotas diferentes)
 VEHICLE_COLORS = [
     (0, 0, 255),  # Azul
-    (0, 255, 0),  # Verde
-    (255, 0, 255),  # Magenta
+    (6, 64, 43),  # Verde
+    (148, 0, 211),  # Magenta
     (0, 255, 255),  # Ciano
     (255, 128, 0),  # Laranja
 ]

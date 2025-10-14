@@ -2,10 +2,8 @@ import random
 from typing import List, Tuple
 
 from config import (
-    PENALTY_EXCEEDS_RANGE,
     PENALTY_OVERLOAD,
     PENALTY_PRIORITY,
-    VEHICLE_MAX_DISTANCE,
 )
 from models import Delivery, Priority
 
@@ -45,7 +43,7 @@ def optimize_vehicle_route_nearest_neighbor(route: List[Delivery], depot: Tuple[
     return optimized
 
 
-def split_deliveries_by_vehicle(deliveries: List[Delivery], num_vehicles: int, depot: Tuple[int, int], vehicle_capacities: List[float]) -> List[List[Delivery]]:
+def split_deliveries_by_vehicle(deliveries: List[Delivery], num_vehicles: int, depot: Tuple[int, int], vehicle_capacities: List[float], vehicle_max_deliveries: List[int]) -> List[List[Delivery]]:
     sorted_deliveries = deliveries.copy()
 
     sorted_deliveries.sort(key=lambda d: d.priority.value)
@@ -55,13 +53,22 @@ def split_deliveries_by_vehicle(deliveries: List[Delivery], num_vehicles: int, d
     vehicle_loads = [0.0 for _ in range(num_vehicles)]
 
     for delivery in sorted_deliveries:
-        # Encontra veículo com menor carga que ainda tem espaço
         best_vehicle = None
         min_load = float("inf")
 
         for i in range(num_vehicles):
-            if vehicle_loads[i] + delivery.weight <= vehicle_capacities[i]:
-                if vehicle_loads[i] < min_load:
+            has_weight_capacity = vehicle_loads[i] + delivery.weight <= vehicle_capacities[i]
+            has_delivery_capacity = len(vehicle_routes[i]) < vehicle_max_deliveries[i]
+
+            if has_weight_capacity and has_delivery_capacity and vehicle_loads[i] < min_load:
+                min_load = vehicle_loads[i]
+                best_vehicle = i
+
+        if best_vehicle is None:
+            min_load = float("inf")
+            for i in range(num_vehicles):
+                has_delivery_capacity = len(vehicle_routes[i]) < vehicle_max_deliveries[i]
+                if has_delivery_capacity and vehicle_loads[i] < min_load:
                     min_load = vehicle_loads[i]
                     best_vehicle = i
 
@@ -70,6 +77,46 @@ def split_deliveries_by_vehicle(deliveries: List[Delivery], num_vehicles: int, d
 
         vehicle_routes[best_vehicle].append(delivery)
         vehicle_loads[best_vehicle] += delivery.weight
+
+    # Redistribui entregas excedentes (que excedem o NÚMERO máximo de entregas)
+    for vehicle_id in range(num_vehicles):
+        max_deliveries = vehicle_max_deliveries[vehicle_id]
+
+        while len(vehicle_routes[vehicle_id]) > max_deliveries:
+            excess_delivery = vehicle_routes[vehicle_id].pop()
+            vehicle_loads[vehicle_id] -= excess_delivery.weight
+            reallocated = False
+
+            for other_id in range(num_vehicles):
+                if other_id == vehicle_id:
+                    continue
+
+                has_weight_capacity = vehicle_loads[other_id] + excess_delivery.weight <= vehicle_capacities[other_id]
+                has_delivery_capacity = len(vehicle_routes[other_id]) < vehicle_max_deliveries[other_id]
+
+                if has_weight_capacity and has_delivery_capacity:
+                    vehicle_routes[other_id].append(excess_delivery)
+                    vehicle_loads[other_id] += excess_delivery.weight
+                    reallocated = True
+                    break
+
+            if not reallocated:
+                for other_id in range(num_vehicles):
+                    if other_id == vehicle_id:
+                        continue
+
+                    has_delivery_capacity = len(vehicle_routes[other_id]) < vehicle_max_deliveries[other_id]
+
+                    if has_delivery_capacity:
+                        vehicle_routes[other_id].append(excess_delivery)
+                        vehicle_loads[other_id] += excess_delivery.weight
+                        reallocated = True
+                        break
+
+            if not reallocated:
+                best_other = min((i for i in range(num_vehicles) if i != vehicle_id), key=lambda i: vehicle_loads[i])
+                vehicle_routes[best_other].append(excess_delivery)
+                vehicle_loads[best_other] += excess_delivery.weight
 
     optimized_routes = []
     for route in vehicle_routes:
@@ -80,6 +127,10 @@ def split_deliveries_by_vehicle(deliveries: List[Delivery], num_vehicles: int, d
 
 
 def calculate_route_distance(route: List[Delivery], depot: Tuple[int, int]) -> float:
+    # Se a rota estiver vazia, distância é zero
+    if not route:
+        return 0.0
+
     total = 0.0
 
     total += calculate_distance(depot, route[0].location)
@@ -92,16 +143,17 @@ def calculate_route_distance(route: List[Delivery], depot: Tuple[int, int]) -> f
     return total
 
 
-def calculate_fitness_multi_vehicle(deliveries: List[Delivery], num_vehicles: int, depot: Tuple[int, int], vehicle_capacities: List[float]) -> float:
+def calculate_fitness_multi_vehicle(deliveries: List[Delivery], num_vehicles: int, depot: Tuple[int, int], vehicle_capacities: List[float], vehicle_max_deliveries: List[int]) -> float:
     if not deliveries:
         return float("inf")
 
-    vehicle_routes = split_deliveries_by_vehicle(deliveries, num_vehicles, depot, vehicle_capacities)
+    vehicle_routes = split_deliveries_by_vehicle(
+        deliveries, num_vehicles, depot, vehicle_capacities, vehicle_max_deliveries
+    )
 
     total_distance = 0.0
     priority_penalty = 0.0
     capacity_penalty = 0.0
-    range_penalty = 0.0
 
     for vehicle_id, route in enumerate(vehicle_routes):
         if not route:
@@ -129,12 +181,7 @@ def calculate_fitness_multi_vehicle(deliveries: List[Delivery], num_vehicles: in
             overload = route_load - vehicle_capacity
             capacity_penalty += PENALTY_OVERLOAD * (overload / vehicle_capacity)
 
-        # Penaliza excesso de autonomia
-        if route_distance > VEHICLE_MAX_DISTANCE:
-            excess_distance = route_distance - VEHICLE_MAX_DISTANCE
-            range_penalty += PENALTY_EXCEEDS_RANGE * (excess_distance / VEHICLE_MAX_DISTANCE)
-
-    if priority_penalty > 0 or capacity_penalty > 0 or range_penalty > 0:
-        return total_distance + priority_penalty + capacity_penalty + range_penalty
+    if priority_penalty > 0 or capacity_penalty > 0:
+        return total_distance + priority_penalty + capacity_penalty
 
     return total_distance
