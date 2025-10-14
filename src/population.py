@@ -145,9 +145,42 @@ def split_deliveries_by_vehicle(deliveries: List[Delivery], num_vehicles: int, d
                 vehicle_routes[best_other].append(excess_delivery)
                 vehicle_loads[best_other] += excess_delivery.weight
 
-    optimized_routes = []
+    def optimize_route_respecting_priority(route: List[Delivery], depot_pos: Tuple[int, int]) -> List[Delivery]:
+        """Agrupa as entregas por prioridade (CRITICAL, HIGH, MEDIUM, LOW) e aplica
+        a heurística do vizinho mais próximo dentro de cada grupo, garantindo que
+        todas as entregas de maior prioridade venham antes das de prioridade inferior.
+        """
+        if not route:
+            return []
+
+        # Ordena prioridades na ordem desejada (menor value = maior prioridade)
+        priority_order = sorted([p for p in Priority], key=lambda p: p.value)
+
+        final_route: List[Delivery] = []
+        current_position = depot_pos
+
+        for pr in priority_order:
+            group = [d for d in route if d.priority == pr]
+            if not group:
+                continue
+
+            # aplica vizinho mais próximo iniciando em current_position
+            remaining = group.copy()
+            optimized_group: List[Delivery] = []
+
+            while remaining:
+                nearest = min(remaining, key=lambda delivery: calculate_distance(current_position, delivery.location))
+                optimized_group.append(nearest)
+                current_position = nearest.location
+                remaining.remove(nearest)
+
+            final_route.extend(optimized_group)
+
+        return final_route
+
+    optimized_routes: List[List[Delivery]] = []
     for route in vehicle_routes:
-        optimized_route = optimize_vehicle_route_nearest_neighbor(route, depot)
+        optimized_route = optimize_route_respecting_priority(route, depot)
         optimized_routes.append(optimized_route)
 
     return optimized_routes
