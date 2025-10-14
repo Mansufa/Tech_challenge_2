@@ -6,21 +6,19 @@ import numpy as np
 import pygame
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 
-from config import GREEN, PRIORITY_COLORS, RED, VEHICLE_COLORS, NUM_VEHICLES
+import math
+from config import GREEN, PRIORITY_COLORS, RED, VEHICLE_COLORS
 from models import Delivery, Priority
 
 matplotlib.use("Agg")
 
 
 def draw_deliveries(screen: pygame.Surface, deliveries: List[Delivery], radius: int):
-    for i, delivery in enumerate(deliveries):
-        if i == 0:
-            # Primeira entrega em verde (depósito/ponto inicial)
-            pygame.draw.circle(screen, GREEN, delivery.location, radius + 2)
-        else:
-            # Cor baseada na prioridade
-            color = PRIORITY_COLORS.get(delivery.priority, RED)
-            pygame.draw.circle(screen, color, delivery.location, radius)
+    # Desenha todas as cidades usando somente as cores definidas em PRIORITY_COLORS.
+    # O depósito deve ser desenhado explicitamente por draw_depot quando necessário.
+    for delivery in deliveries:
+        color = PRIORITY_COLORS.get(delivery.priority, RED)
+        pygame.draw.circle(screen, color, delivery.location, radius)
 
 
 def draw_plot(
@@ -93,13 +91,27 @@ def draw_multiple_routes(screen: pygame.Surface, vehicle_routes: List[List[Deliv
         font = pygame.font.SysFont("Arial", 14)
     except Exception:
         font = pygame.font.SysFont("Arial", 14)
-
-    # Desenha cada rota com cor diferente
+    # Desenha cada rota com cor diferente. Se a rota estiver vazia, desenha um marcador
+    # próximo ao depósito identificando o veículo (para mostrar veículos vazios).
+    num_vehicles = len(vehicle_routes)
+    offset_radius = 26
     for idx, route in enumerate(vehicle_routes):
-        if not route:
-            continue
-
         color = VEHICLE_COLORS[idx % len(VEHICLE_COLORS)]
+
+        if not route:
+            # Desenha um pequeno traço saindo do depósito para indicar veículo vazio
+            angle = (2 * math.pi * idx) / max(1, num_vehicles)
+            ox = int(depot[0] + math.cos(angle) * offset_radius)
+            oy = int(depot[1] + math.sin(angle) * offset_radius)
+
+            pygame.draw.line(screen, color, depot, (ox, oy), 2)
+            pygame.draw.circle(screen, color, (ox, oy),
+                               max(4, int(offset_radius / 6)))
+            # Etiqueta pequena
+            label = font.render(f"V{idx+1}", True, (0, 0, 0))
+            label_rect = label.get_rect(midleft=(ox + 8, oy))
+            screen.blit(label, label_rect)
+            continue
 
         first_delivery = route[0]
         pygame.draw.line(screen, color, depot, first_delivery.location, 2)
@@ -115,7 +127,6 @@ def draw_multiple_routes(screen: pygame.Surface, vehicle_routes: List[List[Deliv
         for position, delivery in enumerate(route, start=1):
             text = font.render(str(position), True, (0, 0, 0))
             text_rect = text.get_rect(center=delivery.location)
-
             screen.blit(text, text_rect)
 
 
@@ -124,7 +135,7 @@ def draw_depot(screen: pygame.Surface, depot: Tuple[int, int], radius: int = 10)
     pygame.draw.circle(screen, (0, 0, 0), depot, radius + 4, 2)  # Borda preta
 
 
-def draw_legend(screen: pygame.Surface, x: int | None = None, y: int | None = None):
+def draw_legend(screen: pygame.Surface, x: int | None = None, y: int | None = None, num_vehicles: int = 0, theme: str = "auto"):
     # Torna a legenda responsiva ao tamanho da janela
     screen_width, screen_height = screen.get_size()
 
@@ -151,25 +162,50 @@ def draw_legend(screen: pygame.Surface, x: int | None = None, y: int | None = No
     # Calcula tamanho estimado da caixa de legenda (duas colunas) responsivo
     line_height = int(base_font_size * 1.5)
     left_lines = len(items) + 1
-    right_lines = max(1, NUM_VEHICLES)
+    right_lines = max(1, num_vehicles)
     total_lines = max(left_lines, right_lines)
     box_height = int((total_lines * line_height) + margin)
     box_width = int(min(screen_width * 0.48, 420))
 
+    # Escolhe cores de fundo/borda/texto de acordo com o tema (ou heurística 'auto')
+    # Temas suportados: 'auto', 'light', 'dark'
+    bg_color = (250, 250, 250, 220)
+    border_color = (160, 160, 160)
+    text_color = (0, 0, 0)
+
+    if theme == "auto":
+        try:
+            top_left = screen.get_at((0, 0))
+            avg = (top_left.r + top_left.g + top_left.b) / 3
+            theme = "light" if avg > 180 else "dark"
+        except Exception:
+            theme = "light"
+
+    if theme == "dark":
+        bg_color = (30, 30, 30, 220)
+        border_color = (100, 100, 100)
+        text_color = (230, 230, 230)
+    elif theme == "light":
+        bg_color = (250, 250, 250, 220)
+        border_color = (160, 160, 160)
+        text_color = (10, 10, 10)
+
     # Desenha retângulo de fundo semi-transparente usando Surface com alpha
     bg_rect = pygame.Rect(x - 8, y - 8, box_width, box_height)
     try:
-        overlay = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
-        overlay.fill((250, 250, 250, 220))  # branco levemente translúcido
+        overlay = pygame.Surface(
+            (bg_rect.width, bg_rect.height), pygame.SRCALPHA)
+        overlay.fill(bg_color)
         screen.blit(overlay, (bg_rect.x, bg_rect.y))
-        pygame.draw.rect(screen, (160, 160, 160), bg_rect, 1)  # borda
+        pygame.draw.rect(screen, border_color, bg_rect, 1)  # borda
     except Exception:
         # fallback sólido se Surface alpha não suportado
-        pygame.draw.rect(screen, (245, 245, 245), bg_rect)
-        pygame.draw.rect(screen, (180, 180, 180), bg_rect, 1)
+        solid_bg = bg_color[:3] if len(bg_color) > 3 else bg_color
+        pygame.draw.rect(screen, solid_bg, bg_rect)
+        pygame.draw.rect(screen, border_color, bg_rect, 1)
 
     # Título da legenda
-    title = title_font.render("Legenda", True, (0, 0, 0))
+    title = title_font.render("Legenda", True, text_color)
     screen.blit(title, (x + 8, y - 6))
 
     # Coordenadas base para colunas (ajustadas para o tamanho da caixa)
@@ -179,26 +215,30 @@ def draw_legend(screen: pygame.Surface, x: int | None = None, y: int | None = No
     # Itens de prioridade (coluna esquerda)
     for i, (priority, label) in enumerate(items):
         pos_y = y + (i * line_height) + 8
-        color = GREEN if priority is None else PRIORITY_COLORS.get(priority, RED)
+        color = GREEN if priority is None else PRIORITY_COLORS.get(
+            priority, RED)
 
-        pygame.draw.circle(screen, color, (left_x + 8, pos_y + int(line_height / 2)), int(base_font_size * 0.45))
+        pygame.draw.circle(screen, color, (left_x + 8, pos_y +
+                           int(line_height / 2)), int(base_font_size * 0.45))
 
-        text = font.render(label, True, (0, 0, 0))
+        text = font.render(label, True, text_color)
         screen.blit(text, (left_x + 26, pos_y))
 
     # Cabeçalho das rotas/veículos (coluna direita)
-    vehicle_header = font.render("Rotas / Veículos:", True, (0, 0, 0))
+    vehicle_header = font.render("Rotas / Veículos:", True, text_color)
     screen.blit(vehicle_header, (right_x, y + 2))
 
     # Desenha cada veículo com uma linha colorida e um marcador (coluna direita)
-    for i in range(NUM_VEHICLES):
+    for i in range(num_vehicles):
         pos_y = y + 18 + (i * line_height)
         color = VEHICLE_COLORS[i % len(VEHICLE_COLORS)]
 
         # Linha de exemplo da rota
-        pygame.draw.line(screen, color, (right_x + 6, pos_y + int(line_height / 2)), (right_x + 36, pos_y + int(line_height / 2)), max(2, int(base_font_size / 3)))
+        pygame.draw.line(screen, color, (right_x + 6, pos_y + int(line_height / 2)),
+                         (right_x + 36, pos_y + int(line_height / 2)), max(2, int(base_font_size / 3)))
         # Marcador circular no início da linha
-        pygame.draw.circle(screen, color, (right_x + 6, pos_y + int(line_height / 2)), max(3, int(base_font_size / 2)))
+        pygame.draw.circle(screen, color, (right_x + 6, pos_y +
+                           int(line_height / 2)), max(3, int(base_font_size / 2)))
 
-        text = font.render(f"Veículo {i+1}", True, (0, 0, 0))
+        text = font.render(f"Veículo {i+1}", True, text_color)
         screen.blit(text, (right_x + 44, pos_y))

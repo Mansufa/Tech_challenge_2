@@ -48,9 +48,9 @@ PRIORITY_COLORS = {
 VEHICLE_COLORS = [
     (0, 0, 255),  # Azul
     (6, 64, 43),  # Verde
-    (148, 0, 211),  # Magenta
+    (222, 62, 254),  # Magenta
     (0, 255, 255),  # Ciano
-    (255, 128, 0),  # Laranja
+    (137, 81, 41),  # Marrom
 ]
 
 

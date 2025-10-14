@@ -32,7 +32,8 @@ def optimize_vehicle_route_nearest_neighbor(route: List[Delivery], depot: Tuple[
 
     while remaining:
         # Encontra a entrega mais próxima da posição atual
-        nearest = min(remaining, key=lambda delivery: calculate_distance(current_position, delivery.location))
+        nearest = min(remaining, key=lambda delivery: calculate_distance(
+            current_position, delivery.location))
 
         optimized.append(nearest)
 
@@ -52,13 +53,34 @@ def split_deliveries_by_vehicle(deliveries: List[Delivery], num_vehicles: int, d
     vehicle_routes = [[] for _ in range(num_vehicles)]
     vehicle_loads = [0.0 for _ in range(num_vehicles)]
 
+    # Tenta garantir, sempre que possível, que cada veículo receba ao menos uma entrega.
+    # Isso ajuda a evitar cenários onde vários veículos ficam vazios quando há entregas suficientes.
+    if len(sorted_deliveries) >= num_vehicles:
+        # Para fairness, atribuimos as entregas de maior prioridade primeiro (lista já ordenada).
+        for i in range(num_vehicles):
+            # Procura a primeira entrega que caiba no veículo e que respeite o limite de entregas
+            assigned = False
+            for idx, delivery in enumerate(sorted_deliveries):
+                if delivery.weight <= vehicle_capacities[i] and vehicle_max_deliveries[i] > 0:
+                    vehicle_routes[i].append(delivery)
+                    vehicle_loads[i] += delivery.weight
+                    # Remove da lista de entregas pendentes
+                    sorted_deliveries.pop(idx)
+                    assigned = True
+                    break
+            # Se nenhum item coube (por limite de peso), deixamos o veículo vazio e seguimos
+            if not assigned:
+                continue
+
     for delivery in sorted_deliveries:
         best_vehicle = None
         min_load = float("inf")
 
         for i in range(num_vehicles):
-            has_weight_capacity = vehicle_loads[i] + delivery.weight <= vehicle_capacities[i]
-            has_delivery_capacity = len(vehicle_routes[i]) < vehicle_max_deliveries[i]
+            has_weight_capacity = vehicle_loads[i] + \
+                delivery.weight <= vehicle_capacities[i]
+            has_delivery_capacity = len(
+                vehicle_routes[i]) < vehicle_max_deliveries[i]
 
             if has_weight_capacity and has_delivery_capacity and vehicle_loads[i] < min_load:
                 min_load = vehicle_loads[i]
@@ -67,7 +89,8 @@ def split_deliveries_by_vehicle(deliveries: List[Delivery], num_vehicles: int, d
         if best_vehicle is None:
             min_load = float("inf")
             for i in range(num_vehicles):
-                has_delivery_capacity = len(vehicle_routes[i]) < vehicle_max_deliveries[i]
+                has_delivery_capacity = len(
+                    vehicle_routes[i]) < vehicle_max_deliveries[i]
                 if has_delivery_capacity and vehicle_loads[i] < min_load:
                     min_load = vehicle_loads[i]
                     best_vehicle = i
@@ -91,8 +114,10 @@ def split_deliveries_by_vehicle(deliveries: List[Delivery], num_vehicles: int, d
                 if other_id == vehicle_id:
                     continue
 
-                has_weight_capacity = vehicle_loads[other_id] + excess_delivery.weight <= vehicle_capacities[other_id]
-                has_delivery_capacity = len(vehicle_routes[other_id]) < vehicle_max_deliveries[other_id]
+                has_weight_capacity = vehicle_loads[other_id] + \
+                    excess_delivery.weight <= vehicle_capacities[other_id]
+                has_delivery_capacity = len(
+                    vehicle_routes[other_id]) < vehicle_max_deliveries[other_id]
 
                 if has_weight_capacity and has_delivery_capacity:
                     vehicle_routes[other_id].append(excess_delivery)
@@ -105,7 +130,8 @@ def split_deliveries_by_vehicle(deliveries: List[Delivery], num_vehicles: int, d
                     if other_id == vehicle_id:
                         continue
 
-                    has_delivery_capacity = len(vehicle_routes[other_id]) < vehicle_max_deliveries[other_id]
+                    has_delivery_capacity = len(
+                        vehicle_routes[other_id]) < vehicle_max_deliveries[other_id]
 
                     if has_delivery_capacity:
                         vehicle_routes[other_id].append(excess_delivery)
@@ -114,7 +140,8 @@ def split_deliveries_by_vehicle(deliveries: List[Delivery], num_vehicles: int, d
                         break
 
             if not reallocated:
-                best_other = min((i for i in range(num_vehicles) if i != vehicle_id), key=lambda i: vehicle_loads[i])
+                best_other = min((i for i in range(
+                    num_vehicles) if i != vehicle_id), key=lambda i: vehicle_loads[i])
                 vehicle_routes[best_other].append(excess_delivery)
                 vehicle_loads[best_other] += excess_delivery.weight
 
@@ -179,7 +206,8 @@ def calculate_fitness_multi_vehicle(deliveries: List[Delivery], num_vehicles: in
 
         if route_load > vehicle_capacity:
             overload = route_load - vehicle_capacity
-            capacity_penalty += PENALTY_OVERLOAD * (overload / vehicle_capacity)
+            capacity_penalty += PENALTY_OVERLOAD * \
+                (overload / vehicle_capacity)
 
     if priority_penalty > 0 or capacity_penalty > 0:
         return total_distance + priority_penalty + capacity_penalty
