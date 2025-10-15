@@ -1,140 +1,85 @@
-# TSP Solver — Genetic Algorithm (Python)
+# Tech Challenge - Fase 2: Otimização de Rotas Médicas com Algoritmos Genéticos
 
-Uma implementação em Python de um solucionador para o problema do Caixeiro Viajante (TSP) usando Algoritmo Genético (GA) com visualização via Pygame.
-![visualização do TSP](image.png)
+## 1. Descrição do Projeto
 
-## Visão geral
-O projeto cria e evolui uma população de rotas (permutations de cidades) usando operadores típicos de GA (crossover do tipo order, mutação, elitismo), e exibe em tempo real a melhor solução encontrada usando Pygame. Ao final, os melhores resultados são salvos em `top50_results.csv` e `top50_results.json`.
-## Estrutura principal
+O objetivo deste projeto é desenvolver um sistema de otimização de rotas para a distribuição de medicamentos e insumos de um hospital. O sistema utiliza Algoritmos Genéticos para resolver um Problema de Roteamento de Veículos (VRP) complexo, considerando múltiplas restrições do mundo real, como capacidade de carga, número máximo de entregas por veículo e prioridades variadas para cada entrega. A solução busca minimizar a distância total percorrida pela frota, ao mesmo tempo que respeita todas as restrições operacionais, garantindo eficiência e urgência.
 
-- `tsp.py` — script principal que inicializa o problema, roda a simulação/visualização e salva os resultados.
-- `genetic_algorithm.py` — implementação do GA (geração, fitness, crossover, mutação, ordenação).
-- `draw_functions.py` — funções auxiliares para desenhar cidades, rotas e gráfico usando Matplotlib + Pygame.
-- `benchmark_att48.py` — dados do benchmark att48 (opcional).
-## Dependências
+## 2. Tecnologias Utilizadas
 
-- Python 3.10+ (testado aqui com Python 3.13)
-- numpy
-- pygame
-- matplotlib
-O repositório contém um `environment.yml` para criação de ambiente Conda; alternativamente você pode instalar com pip.
+*   **Python 3.11+:** Linguagem principal para o desenvolvimento de toda a lógica.
+*   **Pygame:** Biblioteca utilizada para criar a interface gráfica interativa, permitindo a visualização em tempo real do processo de otimização e a entrada de parâmetros pelo usuário.
+*   **NumPy:** Utilizada para cálculos numéricos eficientes, especialmente na manipulação de probabilidades para a seleção de indivíduos no algoritmo genético.
+*   **Pipenv:** Ferramenta para gerenciamento de dependências e ambientes virtuais, garantindo a reprodutibilidade do ambiente de desenvolvimento.
 
-### Usando Conda (recomendado)
-```bash
-conda env create --file environment.yml
-conda activate fiap_tsp
-### Usando virtualenv / pip
+## 3. Instalação e Execução
 
-```bash
-python -m venv .venv
-source .venv/bin/activate    # ou .venv\Scripts\activate no Windows (PowerShell: .venv\Scripts\Activate.ps1)
-pip install --upgrade pip
-pip install numpy pygame matplotlib
-## Como executar
+Siga os passos abaixo para configurar e executar o projeto em seu ambiente local.
 
-Abra um terminal no diretório do projeto e execute:
-```bash
-# usando o python do ambiente ativo
-python tsp.py
-Observações:
-- O script abre uma janela do Pygame para visualização. Pressione a tecla `q` ou feche a janela para encerrar.
-- Parâmetros importantes estão no topo de `tsp.py` e podem ser alterados:
-  - `TIME_LIMIT_SECONDS` — tempo máximo de execução (padrão: 10 ou 120 conforme edição)
-### Modos de problema
+1.  **Instale as dependências:**
+    O `Pipfile` no projeto garante que as dependências corretas sejam instaladas. Execute o comando:
+    ```bash
+    pipenv install
+    ```
 
-O `tsp.py` permite três modos (descomentar/ajustar no arquivo):
-- Geração aleatória de cidades (recomendado para testes rápidos)
-- Problemas pré-definidos (`default_problems` — 10, 12 ou 15 cidades)
-- Benchmark `att48` (dados em `benchmark_att48.py`)
-Por padrão você pode ativar a geração aleatória definindo `cities_locations` usando coordenadas randômicas (veja os comentários em `tsp.py`).
+2.  **Execute o projeto:**
+    Para iniciar a aplicação, utilize o seguinte comando, que ativa o ambiente virtual e executa o script principal:
+    ```bash
+    pipenv run python src/main.py
+    ```
 
-## Saída
-Ao terminar a execução, o script salva automaticamente:
+## 4. Arquitetura do Projeto
 
-- `top50_results.csv` — CSV com os top 50 resultados (rank, generation, fitness, rota)
-- `top50_results.json` — JSON estruturado com metadata e top results
-Exemplo de uso programático: você pode ler `top50_results.json` para analisar os melhores trajetos e gerar imagens estáticas.
+O projeto foi estruturado de forma modular para separar as responsabilidades e facilitar a manutenção. Os principais módulos no diretório `src/` são:
 
-## Troubleshooting
-- ModuleNotFoundError para `pygame` / `matplotlib` / `numpy`: instale as dependências conforme instruções acima.
-- Se o Matplotlib reportar warnings de muitas figuras abertas, atualize `draw_functions.py` (já incluí uma chamada a `plt.close(fig)` para mitigar isso).
-- Em ambientes sem display (servidores/CI) a janela do Pygame pode falhar; para rodar em modo "headless" você precisará adaptar `draw_functions.py` (gerar imagens sem abrir janela) ou usar um framebuffer virtual.
-## Contribuições
+*   **[`main.py`](src/main.py):** Ponto de entrada e orquestrador principal. É responsável por inicializar o Pygame, obter os parâmetros do usuário, controlar o loop principal do Algoritmo Genético e salvar os resultados finais.
+*   **[`models.py`](src/models.py):** Define as estruturas de dados centrais do projeto, como a classe `Delivery` para representar uma entrega e o enum `Priority` para os níveis de prioridade.
+*   **[`config.py`](src/config.py):** Centraliza todas as constantes e parâmetros configuráveis, como o tamanho da população, taxa de mutação, penalidades e cores para visualização.
+*   **[`population.py`](src/population.py):** Contém a lógica essencial do VRP, incluindo a criação da população inicial, a complexa função de cálculo de fitness e a estratégia para dividir uma lista de entregas entre os múltiplos veículos.
+*   **[`genetic_operators.py`](src/genetic_operators.py):** Implementa as funções puras do Algoritmo Genético: Seleção (implícita no loop principal), Crossover (`order_crossover`) e Mutação (`swap_mutation`).
+*   **[`visualization.py`](src/visualization.py):** Agrupa todas as funções responsáveis por desenhar os elementos na tela com Pygame, como o depósito, as entregas, as rotas dos veículos e o gráfico de evolução do fitness.
 
-Melhorias bem-vindas: parâmetros de seleção e recombinação, heurísticas iniciais (nearest neighbor), exportar imagem com a melhor rota, experimentos automatizados (benchmarks/variações de parâmetros).
+## 5. Implementação do Algoritmo Genético
+
+### 5.1. Codificação (Representação do Indivíduo)
+
+Um "indivíduo" na população representa uma solução candidata completa para o problema. Ele é codificado como uma lista única contendo a sequência (permutação) de todos os objetos `Delivery` a serem realizados. Essa representação linear é ideal para a aplicação de operadores genéticos como o crossover de ordem. Posteriormente, a função [`split_deliveries_by_vehicle`](src/population.py) processa essa lista para dividi-la de forma inteligente entre os veículos disponíveis, gerando as rotas individuais que serão avaliadas.
+
+### 5.2. Função Fitness e Restrições
+
+A função fitness, implementada em [`calculate_fitness_multi_vehicle`](src/population.py), é o coração do algoritmo e avalia a qualidade de cada indivíduo. Ela vai além da simples distância, incorporando um sistema de penalidades para garantir que as soluções evoluam em direção ao cumprimento de todas as restrições do problema. A fórmula geral é: *Fitness = Distância Total + Penalidade de Carga + Penalidade de Prioridade*.
+
+*   **Múltiplos Veículos:** A lista de entregas do indivíduo é dividida entre os veículos pela função [`split_deliveries_by_vehicle`](src/population.py). Essa função primeiro ordena as entregas por prioridade e depois as atribui ao veículo com menor carga atual que ainda possua capacidade de peso e de número de entregas.
+*   **Capacidade de Carga:** Se a soma dos pesos das entregas em uma rota excede a capacidade do veículo correspondente, uma penalidade (`PENALTY_OVERLOAD`) é adicionada ao fitness. A magnitude da penalidade é proporcional à porcentagem de sobrecarga, desencorajando fortemente soluções inválidas.
+*   **Autonomia do Veículo:** Embora não haja uma penalidade explícita para autonomia, a própria função fitness busca minimizar a distância total percorrida (`total_distance`). Ao otimizar a distância de cada rota, o algoritmo indiretamente favorece soluções que consomem menos "autonomia".
+*   **Prioridade de Entregas:** A prioridade é tratada de duas formas:
+    1.  **Na divisão de rotas:** A função [`optimize_route_respecting_priority`](src/population.py) organiza as entregas dentro da rota de cada veículo para que os grupos de maior prioridade (CRITICAL, HIGH) sejam atendidos antes dos de menor prioridade.
+    2.  **Na função fitness:** Uma penalidade (`PENALTY_PRIORITY`) é aplicada se entregas de alta prioridade aparecem muito tarde na sequência geral de entregas do indivíduo, garantindo que o algoritmo aprenda a posicioná-las no início.
+
+### 5.3. Operadores Genéticos
+
+*   **Seleção:** O algoritmo utiliza uma combinação de **Elitismo**, onde o melhor indivíduo da geração atual é garantido na próxima, e **Seleção por Roleta**, onde os pais são escolhidos aleatoriamente com uma probabilidade inversamente proporcional ao seu fitness (indivíduos melhores têm mais chances de serem escolhidos).
+*   **Crossover:** Foi utilizado o **Ordered Crossover (OX1)**, implementado em [`order_crossover`](src/genetic_operators.py). Este operador é especialmente adequado para problemas de permutação, como o VRP, pois garante que o filho gerado seja sempre uma permutação válida das entregas, sem duplicatas ou omissões.
+*   **Mutação:** A **Swap Mutation** (mutação por troca), implementada em [`swap_mutation`](src/genetic_operators.py), é aplicada com uma probabilidade definida em [`MUTATION_PROBABILITY`](src/config.py). Ela troca a posição de duas entregas adjacentes na lista, introduzindo pequenas variações nas rotas e ajudando o algoritmo a escapar de mínimos locais.
+
+## 6. Resultados e Análise
+
+### 6.1. Visualização
+
+A interface gráfica desenvolvida com Pygame oferece uma visão clara e em tempo real da performance do algoritmo. A tela principal exibe:
+*   **Pontos de Entrega:** Círculos coloridos que representam as entregas, com a cor indicando a prioridade (ex: vermelho para CRÍTICO).
+*   **Rotas dos Veículos:** Linhas de cores distintas conectam o depósito e os pontos de entrega, mostrando a rota otimizada para cada veículo na melhor solução da geração atual.
+*   **Gráfico de Evolução:** Um gráfico no canto superior esquerdo mostra a queda do valor do fitness (eixo Y) ao longo das gerações (eixo X), ilustrando visualmente o aprendizado e a convergência do algoritmo.
+
+### 6.2. Análise de Desempenho
+
+A eficácia do algoritmo genético é claramente demonstrada ao comparar o fitness da primeira geração com o da última. Na geração inicial, as soluções são aleatórias, resultando em um fitness muito alto devido a rotas longas e altas penalidades por violação de restrições. Após o tempo de execução, o fitness da melhor solução encontrada é drasticamente menor. Isso indica que o algoritmo foi capaz de minimizar a distância total percorrida e, ao mesmo tempo, encontrar uma configuração de rotas que respeita a capacidade dos veículos e a prioridade das entregas.
+
+## 7. Desafios Enfrentados e Próximos Passos
+
+Ajustar o peso das penalidades na função fitness foi o maior desafio. Um valor de penalidade muito baixo faria o algoritmo ignorar as restrições, enquanto um valor muito alto poderia impedir a exploração de boas soluções que temporariamente violam uma restrição. Foi necessário um ajuste fino para encontrar um equilíbrio que guiasse a evolução de forma eficaz.
+
+Como próximo passo, o projeto está pronto para a integração com LLMs para a geração de relatórios de rota, conforme o requisito original do desafio. Os dados detalhados de cada rota, já salvos em arquivos CSV, podem ser usados como contexto para que um LLM gere um sumário em linguagem natural para cada motorista, descrevendo sua rota, a ordem das entregas e informações importantes.
+
 ## Licença
 
-Este projeto está licenciado sob a MIT License — ver arquivo `LICENSE`.
-
----
-Se quiser, eu atualizo o `tsp.py` para que ele ative automaticamente a geração aleatória de cidades (em vez do benchmark att48), e posso rodar o script por X segundos e mostrar os 5 melhores resultados do `top50_results.json`. Me diga o que prefere.
-# TSP Solver using Genetic Algorithm
-
-This repository contains a Python implementation of a Traveling Salesman Problem (TSP) solver using a Genetic Algorithm (GA). The TSP is a classic problem in the field of combinatorial optimization, where the goal is to find the shortest possible route that visits a set of given cities exactly once and returns to the original city.
-
-![alt text](image.png)
-![alt text](image-1.png)
-## Prerequisites
-
-- Download and Install conda environment manager.
-  -  https://www.anaconda.com/download
-- Open the `Anaconda Prompt`
-- create the `fiap_tsp` environment
-  - `conda env create --file environment.yml`
-- activate the environment
-  - `conda activate fiap_tsp`  
-
-## How to Run
-
-Execute the following command in your terminal to run the program:
-
-### Pygame
-```bash
-python tps.py
-```
-> Press the 'q' key to quit the program.
-
-
-
-## Overview
-
-The TSP solver employs a Genetic Algorithm to iteratively evolve a population of candidate solutions towards an optimal or near-optimal solution. The GA operates by mimicking the process of natural selection, where individuals with higher fitness (i.e., shorter route distance) are more likely to survive and produce offspring.
-
-## Files
-
-- **genetic_algorithm.py**: Contains the implementation of the Genetic Algorithm, including functions for generating random populations, calculating fitness, performing crossover and mutation operations, and sorting populations based on fitness.
-- **tsp.py**: Implements the main TSP solver using Pygame for visualization. It initializes the problem, creates the initial population, and iteratively evolves the population while visualizing the best solution found so far.
-- **draw_functions.py**: Provides functions for drawing cities, paths, and plots using Pygame.
-
-## Usage
-
-To run the TSP solver, execute the `tsp.py` script using Python. The solver allows you to choose between different problem instances:
-
-- Randomly generated cities
-- Default predefined problems with 10, 12, or 15 cities
-- `att48` benchmark dataset (uncomment relevant code in `tsp.py`)
-
-You can customize parameters such as population size, number of generations, and mutation probability directly in the `tsp.py` script.
-
-## Dependencies
-
-- Python 3.x
-- Pygame (for visualization)
-
-Ensure Pygame is installed before running the solver. You can install Pygame using pip:
-
-```bash
-pip install pygame
-```
-
-## Acknowledgments
-
-This TSP solver was developed as a learning project and draws inspiration from various online resources and academic materials on Genetic Algorithms and the Traveling Salesman Problem. Special thanks to the authors of those resources for sharing their knowledge.
-
-## License
-
-This project is licensed under the [MIT License](LICENSE).
-
----
-
-Feel free to contribute to this repository by providing enhancements, bug fixes, or additional features. If you encounter any issues or have suggestions for improvements, please open an issue on the repository. Happy solving!
+Este projeto está licenciado sob a licença CC0 1.0 Universal. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
