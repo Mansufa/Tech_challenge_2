@@ -1,0 +1,248 @@
+import random
+from typing import List, Tuple
+
+from config import (
+    PENALTY_OVERLOAD,
+    PENALTY_PRIORITY,
+)
+from models import Delivery, Priority
+
+
+def create_initial_population_deliveries(deliveries: List[Delivery], population_size: int) -> List[List[Delivery]]:
+    """Cria população inicial de rotas de entregas aleatórias."""
+    return [random.sample(deliveries, len(deliveries)) for _ in range(population_size)]
+
+
+def calculate_distance(city1: Tuple[float, float], city2: Tuple[float, float]) -> float:
+    """Calcula distância euclidiana entre duas cidades."""
+    return ((city1[0] - city2[0]) ** 2 + (city1[1] - city2[1]) ** 2) ** 0.5
+
+
+def optimize_vehicle_route_nearest_neighbor(route: List[Delivery], depot: Tuple[int, int]) -> List[Delivery]:
+    """Otimiza a rota de um veículo usando a heurística do vizinho mais próximo."""
+    if not route:
+        return route
+
+    if len(route) == 1:
+        return route
+
+    optimized = []
+    current_position = depot
+    remaining = route.copy()
+
+    while remaining:
+        # Encontra a entrega mais próxima da posição atual
+        nearest = min(remaining, key=lambda delivery: calculate_distance(
+            current_position, delivery.location))
+
+        optimized.append(nearest)
+
+        current_position = nearest.location
+
+        remaining.remove(nearest)
+
+    return optimized
+
+
+def split_deliveries_by_vehicle(deliveries: List[Delivery], num_vehicles: int, depot: Tuple[int, int], vehicle_capacities: List[float], vehicle_max_deliveries: List[int]) -> List[List[Delivery]]:
+    sorted_deliveries = deliveries.copy()
+
+    sorted_deliveries.sort(key=lambda d: d.priority.value)
+
+    # Inicializa rotas e cargas de cada veículo
+    vehicle_routes = [[] for _ in range(num_vehicles)]
+    vehicle_loads = [0.0 for _ in range(num_vehicles)]
+
+    # Tenta garantir, sempre que possível, que cada veículo receba ao menos uma entrega.
+    # Isso ajuda a evitar cenários onde vários veículos ficam vazios quando há entregas suficientes.
+    if len(sorted_deliveries) >= num_vehicles:
+        # Para fairness, atribuimos as entregas de maior prioridade primeiro (lista já ordenada).
+        for i in range(num_vehicles):
+            # Procura a primeira entrega que caiba no veículo e que respeite o limite de entregas
+            assigned = False
+            for idx, delivery in enumerate(sorted_deliveries):
+                if delivery.weight <= vehicle_capacities[i] and vehicle_max_deliveries[i] > 0:
+                    vehicle_routes[i].append(delivery)
+                    vehicle_loads[i] += delivery.weight
+                    # Remove da lista de entregas pendentes
+                    sorted_deliveries.pop(idx)
+                    assigned = True
+                    break
+            # Se nenhum item coube (por limite de peso), deixamos o veículo vazio e seguimos
+            if not assigned:
+                continue
+
+    for delivery in sorted_deliveries:
+        best_vehicle = None
+        min_load = float("inf")
+
+        for i in range(num_vehicles):
+            has_weight_capacity = vehicle_loads[i] + \
+                delivery.weight <= vehicle_capacities[i]
+            has_delivery_capacity = len(
+                vehicle_routes[i]) < vehicle_max_deliveries[i]
+
+            if has_weight_capacity and has_delivery_capacity and vehicle_loads[i] < min_load:
+                min_load = vehicle_loads[i]
+                best_vehicle = i
+
+        if best_vehicle is None:
+            min_load = float("inf")
+            for i in range(num_vehicles):
+                has_delivery_capacity = len(
+                    vehicle_routes[i]) < vehicle_max_deliveries[i]
+                if has_delivery_capacity and vehicle_loads[i] < min_load:
+                    min_load = vehicle_loads[i]
+                    best_vehicle = i
+
+        if best_vehicle is None:
+            best_vehicle = vehicle_loads.index(min(vehicle_loads))
+
+        vehicle_routes[best_vehicle].append(delivery)
+        vehicle_loads[best_vehicle] += delivery.weight
+
+    # Redistribui entregas excedentes (que excedem o NÚMERO máximo de entregas)
+    for vehicle_id in range(num_vehicles):
+        max_deliveries = vehicle_max_deliveries[vehicle_id]
+
+        while len(vehicle_routes[vehicle_id]) > max_deliveries:
+            excess_delivery = vehicle_routes[vehicle_id].pop()
+            vehicle_loads[vehicle_id] -= excess_delivery.weight
+            reallocated = False
+
+            for other_id in range(num_vehicles):
+                if other_id == vehicle_id:
+                    continue
+
+                has_weight_capacity = vehicle_loads[other_id] + \
+                    excess_delivery.weight <= vehicle_capacities[other_id]
+                has_delivery_capacity = len(
+                    vehicle_routes[other_id]) < vehicle_max_deliveries[other_id]
+
+                if has_weight_capacity and has_delivery_capacity:
+                    vehicle_routes[other_id].append(excess_delivery)
+                    vehicle_loads[other_id] += excess_delivery.weight
+                    reallocated = True
+                    break
+
+            if not reallocated:
+                for other_id in range(num_vehicles):
+                    if other_id == vehicle_id:
+                        continue
+
+                    has_delivery_capacity = len(
+                        vehicle_routes[other_id]) < vehicle_max_deliveries[other_id]
+
+                    if has_delivery_capacity:
+                        vehicle_routes[other_id].append(excess_delivery)
+                        vehicle_loads[other_id] += excess_delivery.weight
+                        reallocated = True
+                        break
+
+            if not reallocated:
+                best_other = min((i for i in range(
+                    num_vehicles) if i != vehicle_id), key=lambda i: vehicle_loads[i])
+                vehicle_routes[best_other].append(excess_delivery)
+                vehicle_loads[best_other] += excess_delivery.weight
+
+    def optimize_route_respecting_priority(route: List[Delivery], depot_pos: Tuple[int, int]) -> List[Delivery]:
+        """Agrupa as entregas por prioridade (CRITICAL, HIGH, MEDIUM, LOW) e aplica
+        a heurística do vizinho mais próximo dentro de cada grupo, garantindo que
+        todas as entregas de maior prioridade venham antes das de prioridade inferior.
+        """
+        if not route:
+            return []
+
+        # Ordena prioridades na ordem desejada (menor value = maior prioridade)
+        priority_order = sorted([p for p in Priority], key=lambda p: p.value)
+
+        final_route: List[Delivery] = []
+        current_position = depot_pos
+
+        for pr in priority_order:
+            group = [d for d in route if d.priority == pr]
+            if not group:
+                continue
+
+            # aplica vizinho mais próximo iniciando em current_position
+            remaining = group.copy()
+            optimized_group: List[Delivery] = []
+
+            while remaining:
+                nearest = min(remaining, key=lambda delivery: calculate_distance(current_position, delivery.location))
+                optimized_group.append(nearest)
+                current_position = nearest.location
+                remaining.remove(nearest)
+
+            final_route.extend(optimized_group)
+
+        return final_route
+
+    optimized_routes: List[List[Delivery]] = []
+    for route in vehicle_routes:
+        optimized_route = optimize_route_respecting_priority(route, depot)
+        optimized_routes.append(optimized_route)
+
+    return optimized_routes
+
+
+def calculate_route_distance(route: List[Delivery], depot: Tuple[int, int]) -> float:
+    # Se a rota estiver vazia, distância é zero
+    if not route:
+        return 0.0
+
+    total = 0.0
+
+    total += calculate_distance(depot, route[0].location)
+
+    for i in range(len(route) - 1):
+        total += calculate_distance(route[i].location, route[i + 1].location)
+
+    total += calculate_distance(route[-1].location, depot)
+
+    return total
+
+
+def calculate_fitness_multi_vehicle(deliveries: List[Delivery], num_vehicles: int, depot: Tuple[int, int], vehicle_capacities: List[float], vehicle_max_deliveries: List[int]) -> float:
+    if not deliveries:
+        return float("inf")
+
+    vehicle_routes = split_deliveries_by_vehicle(
+        deliveries, num_vehicles, depot, vehicle_capacities, vehicle_max_deliveries
+    )
+
+    total_distance = 0.0
+    priority_penalty = 0.0
+    capacity_penalty = 0.0
+
+    for vehicle_id, route in enumerate(vehicle_routes):
+        if not route:
+            continue
+
+        route_distance = calculate_route_distance(route, depot)
+        total_distance += route_distance
+
+        # Penaliza prioridades mal posicionadas
+        for delivery in route:
+            global_position = deliveries.index(delivery)
+            total_deliveries = len(deliveries)
+
+            if delivery.priority == Priority.CRITICAL and global_position > total_deliveries * 0.2:
+                priority_penalty += PENALTY_PRIORITY * 3.0
+            elif delivery.priority == Priority.HIGH and global_position > total_deliveries * 0.4:
+                priority_penalty += PENALTY_PRIORITY * 2.0
+            elif delivery.priority == Priority.MEDIUM and global_position > total_deliveries * 0.8:
+                priority_penalty += PENALTY_PRIORITY * 1.0
+
+        route_load = sum(d.weight for d in route)
+        vehicle_capacity = vehicle_capacities[vehicle_id]
+
+        if route_load > vehicle_capacity:
+            overload = route_load - vehicle_capacity
+            capacity_penalty += PENALTY_OVERLOAD * \
+                (overload / vehicle_capacity)
+
+    if priority_penalty > 0 or capacity_penalty > 0:
+        return total_distance + priority_penalty + capacity_penalty
+
+    return total_distance
