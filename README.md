@@ -1,4 +1,9 @@
 # Tech Challenge - Fase 2: Otimização de Rotas Médicas com Algoritmos Genéticos
+## Links:
+Repositório -> https://github.com/Mansufa/Tech_challenge_2
+
+Video apresentação -> https://www.youtube.com/watch?v=B4m42YhCTao
+
 
 ## 1. Descrição do Projeto
 
@@ -81,5 +86,6 @@ Ajustar o peso das penalidades na função fitness foi o maior desafio. Um valor
 Como próximo passo, o projeto está pronto para a integração com LLMs para a geração de relatórios de rota, conforme o requisito original do desafio. Os dados detalhados de cada rota, já salvos em arquivos CSV, podem ser usados como contexto para que um LLM gere um sumário em linguagem natural para cada motorista, descrevendo sua rota, a ordem das entregas e informações importantes.
 
 ## Licença
+
 
 Este projeto está licenciado sob a licença CC0 1.0 Universal. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
