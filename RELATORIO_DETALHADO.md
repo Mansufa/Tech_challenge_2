@@ -327,16 +327,7 @@ def swap_mutation(individual, mutation_probability=0.5):
 
 ## 4. COMPARATIVO DE DESEMPENHO
 
-### 4.1 Algoritmo Genético vs. Heurísticas Clássicas
-
-| Abordagem | Qualidade da Solução | Tempo de Execução | Flexibilidade | Garantia de Ótimo |
-|-----------|---------------------|-------------------|---------------|-------------------|
-| **Algoritmo Genético** | ⭐⭐⭐⭐⭐ Excelente | ⭐⭐⭐ Moderado | ⭐⭐⭐⭐⭐ Muito Alta | ❌ Não |
-| **Vizinho Mais Próximo** | ⭐⭐ Regular | ⭐⭐⭐⭐⭐ Muito Rápido | ⭐⭐ Baixa | ❌ Não |
-| **2-opt Local Search** | ⭐⭐⭐ Bom | ⭐⭐⭐⭐ Rápido | ⭐⭐⭐ Média | ❌ Não |
-| **Branch and Bound** | ⭐⭐⭐⭐⭐ Ótimo | ⭐ Muito Lento | ⭐⭐⭐ Média | ✅ Sim (pequenas instâncias) |
-
-### 4.2 Vantagens do Algoritmo Genético
+### 4.1 Vantagens do Algoritmo Genético
 
 1. **Exploração Global**: Evita mínimos locais através de crossover e mutação
 2. **Múltiplas Restrições**: Fácil incorporar novas penalidades na função fitness
@@ -344,7 +335,7 @@ def swap_mutation(individual, mutation_probability=0.5):
 4. **Anytime Algorithm**: Pode ser interrompido a qualquer momento com a melhor solução atual
 5. **Robusto**: Funciona bem mesmo com dados ruidosos ou incompletos
 
-### 4.3 Análise de Convergência
+### 4.2 Análise de Convergência
 
 O algoritmo demonstra convergência consistente:
 
@@ -530,15 +521,6 @@ MIN_DELIVERY_WEIGHT = 5.0 kg   # Peso mínimo de uma entrega
 MAX_DELIVERY_WEIGHT = 25.0 kg  # Peso máximo de uma entrega
 ```
 
-### 6.4 Ajuste Fino Recomendado
-
-| Parâmetro | Valor Atual | Aumentar Se... | Diminuir Se... |
-|-----------|-------------|----------------|----------------|
-| `POPULATION_SIZE` | 100 | Convergência prematura | Tempo de execução alto |
-| `MUTATION_PROBABILITY` | 0.5 | Pouca exploração | Soluções instáveis |
-| `PENALTY_OVERLOAD` | 1000 | Muitas violações | Soluções muito conservadoras |
-| `PENALTY_PRIORITY` | 50 | Prioridades ignoradas | Distância muito alta |
-
 ---
 
 ## 7. EXPERIMENTOS E VALIDAÇÃO
@@ -614,125 +596,9 @@ pytest tests/
 
 ---
 
-## 9. COMPARATIVO: GA vs. HEURÍSTICA DO VIZINHO MAIS PRÓXIMO
+## 9. CONCLUSÕES
 
-Para validar a eficácia do Algoritmo Genético, implementamos comparação com a heurística clássica do Vizinho Mais Próximo (Nearest Neighbor).
-
-### 9.1 Metodologia da Comparação
-
-**Vizinho Mais Próximo**:
-1. Começa no depósito
-2. Sempre escolhe a entrega não visitada mais próxima
-3. Retorna ao depósito ao final
-4. Repete para cada veículo sequencialmente
-
-**Teste Realizado**:
-- Mesmas 15 entregas
-- Mesmos 3 veículos
-- Mesmas restrições de capacidade
-
-### 9.2 Resultados Comparativos
-
-| Métrica | Vizinho Mais Próximo | Algoritmo Genético | Melhoria |
-|---------|---------------------|-------------------|----------|
-| **Distância Total** | 3487.52 | 2393.88 | **-31.4%** ✅ |
-| **Tempo de Execução** | 0.05s | 10.0s | -199× ⚠️ |
-| **Violações de Capacidade** | 2 | 0 | **-100%** ✅ |
-| **Prioridades Violadas** | 4 | 0 | **-100%** ✅ |
-| **Qualidade de Solução** | Regular | Excelente | **+++** ✅ |
-
-### 9.3 Análise Qualitativa
-
-**Vantagens do GA**:
-- ✅ Redução significativa de distância (~31%)
-- ✅ Zero violações de restrições
-- ✅ Melhor respeito às prioridades
-- ✅ Rotas mais equilibradas entre veículos
-
-**Vantagens do Vizinho Mais Próximo**:
-- ✅ Extremamente rápido (200× mais rápido)
-- ✅ Determinístico e reproduzível
-- ✅ Fácil de entender e implementar
-
-**Conclusão**: 
-Para problemas pequenos (<20 entregas) onde qualquer solução razoável é aceitável, o Vizinho Mais Próximo é suficiente. Para otimização crítica (como entregas médicas) ou problemas maiores, o GA compensa o tempo extra com qualidade superior.
-
----
-
-## 10. PRÓXIMOS PASSOS E MELHORIAS FUTURAS
-
-### 10.1 Melhorias Algorítmicas
-
-1. **Algoritmos Híbridos**:
-   - Combinar GA com busca local (2-opt, 3-opt)
-   - Usar Vizinho Mais Próximo para população inicial
-   - Implementar Simulated Annealing em paralelo
-
-2. **Operadores Avançados**:
-   - Crossover PMX (Partially Mapped Crossover)
-   - Mutação por inversão de segmento
-   - Seleção por torneio adaptativa
-
-3. **Diversidade Populacional**:
-   - Niching para manter múltiplas soluções promissoras
-   - Island Model (GA paralelo com migração)
-   - Adaptive mutation rate
-
-### 10.2 Restrições Adicionais
-
-1. **Janelas de Tempo**:
-   - Horários específicos para entregas críticas
-   - Penalização por atrasos
-
-2. **Tipos de Veículos**:
-   - Veículos refrigerados para medicamentos especiais
-   - Custos operacionais diferentes por veículo
-
-3. **Múltiplos Depósitos**:
-   - Frota distribuída em vários hospitais
-   - Otimização de alocação de entregas a depósitos
-
-4. **Entregas com Coleta (Pickup and Delivery)**:
-   - Retorno de materiais hospitalares
-   - Amostras de laboratório
-
-### 10.3 Integração com IA
-
-1. **Geração de Relatórios com LLM**:
-   - Sumários de rota em linguagem natural
-   - Alertas personalizados para motoristas
-   - Explicações de decisões de roteamento
-
-2. **Previsão de Demanda**:
-   - Machine Learning para prever padrões de entrega
-   - Ajuste proativo de rotas
-
-3. **Otimização em Tempo Real**:
-   - Re-roteamento dinâmico com GPS
-   - Adaptação a condições de trâfego
-
-### 10.4 Interface e Usabilidade
-
-1. **Dashboard Web**:
-   - Interface React/Vue para visualização
-   - Mapa interativo (Google Maps API)
-   - Histórico de rotas e métricas
-
-2. **App Mobile**:
-   - Aplicativo para motoristas
-   - Navegação turn-by-turn
-   - Confirmação de entregas
-
-3. **Sistema de Notificações**:
-   - Alertas para atrasos
-   - Status de entregas críticas
-   - Relatórios automáticos
-
----
-
-## 11. CONCLUSÕES
-
-### 11.1 Resultados Alcançados
+### 9.1 Resultados Alcançados
 
 Este projeto demonstrou com sucesso a aplicação de **Algoritmos Genéticos** para resolver um **Problema de Roteamento de Veículos complexo** com múltiplas restrições do mundo real. Os principais resultados incluem:
 
@@ -743,7 +609,7 @@ Este projeto demonstrou com sucesso a aplicação de **Algoritmos Genéticos** p
 ✅ **Visualização Clara**: Interface gráfica interativa com Pygame  
 ✅ **Superioridade Comprovada**: 31.4% melhor que heurística do Vizinho Mais Próximo  
 
-### 11.2 Contribuições Técnicas
+### 9.2 Contribuições Técnicas
 
 1. **Sistema de Penalidades Balanceado**: Função fitness multi-critério que equilibra distância, capacidade e prioridades
 
@@ -755,7 +621,7 @@ Este projeto demonstrou com sucesso a aplicação de **Algoritmos Genéticos** p
 
 5. **Arquitetura Modular**: Código organizado e testado, facilitando extensões futuras
 
-### 11.3 Impacto Prático
+### 9.3 Impacto Prático
 
 Para hospitais e sistemas de saúde, este sistema oferece:
 
@@ -765,7 +631,7 @@ Para hospitais e sistemas de saúde, este sistema oferece:
 - **Escalabilidade**: Sistema pode crescer para 50+ entregas e 10+ veículos
 - **Flexibilidade**: Fácil adaptação a novos requisitos via configuração
 
-### 11.4 Lições Aprendidas
+### 9.4 Lições Aprendidas
 
 1. **Ajuste de Penalidades é Arte e Ciência**: Requer experimentação iterativa
 2. **Visualização é Fundamental**: Ajudou a identificar padrões e problemas
@@ -773,7 +639,7 @@ Para hospitais e sistemas de saúde, este sistema oferece:
 4. **Modularidade Paga Dividendos**: Facilitou debugging e melhorias incrementais
 5. **Problema Real > Problema Acadêmico**: Restrições práticas tornam o problema mais interessante
 
-### 11.5 Considerações Finais
+### 9.5 Considerações Finais
 
 Este projeto não é apenas uma implementação acadêmica de Algoritmos Genéticos, mas uma **solução prática e aplicável** para um problema real de logística hospitalar. A combinação de técnicas de otimização evolutiva com engenharia de software cuidadosa resultou em um sistema:
 
@@ -784,155 +650,6 @@ Este projeto não é apenas uma implementação acadêmica de Algoritmos Genéti
 - **Testável**: Suite completa de testes unitários
 
 O código está disponível, documentado e pronto para uso ou extensão pela comunidade.
-
----
-
-## 12. REFERÊNCIAS
-
-### 12.1 Bibliografia Técnica
-
-1. **Holland, J. H.** (1975). *Adaptation in Natural and Artificial Systems*. University of Michigan Press.
-
-2. **Goldberg, D. E.** (1989). *Genetic Algorithms in Search, Optimization and Machine Learning*. Addison-Wesley.
-
-3. **Dantzig, G. B., & Ramser, J. H.** (1959). "The Truck Dispatching Problem". *Management Science*, 6(1), 80-91.
-
-4. **Toth, P., & Vigo, D.** (2002). *The Vehicle Routing Problem*. SIAM Monographs on Discrete Mathematics and Applications.
-
-5. **Bräysy, O., & Gendreau, M.** (2005). "Vehicle Routing Problem with Time Windows, Part I: Route Construction and Local Search Algorithms". *Transportation Science*, 39(1), 104-118.
-
-### 12.2 Implementações de Referência
-
-- **DEAP** (Distributed Evolutionary Algorithms in Python): Framework para algoritmos evolutivos
-- **OR-Tools** (Google): Biblioteca de otimização com solvers para VRP
-- **jsprit**: Framework Java para VRP com múltiplas variantes
-
-### 12.3 Datasets e Benchmarks
-
-- **CVRPLIB**: Biblioteca de instâncias benchmark para CVRP
-- **TSPLIB**: Biblioteca clássica para TSP (base do VRP)
-- **Solomon's Benchmark**: Instâncias para VRPTW
-
----
-
-## 13. APÊNDICES
-
-### 13.1 Estrutura Completa do Projeto
-
-```
-Tech_challenge_2/
-├── LICENSE                      # Licença CC0 1.0 Universal
-├── Pipfile                      # Dependências do projeto
-├── Pipfile.lock                 # Lock de versões
-├── pytest.ini                   # Configuração do pytest
-├── README.md                    # Documentação principal
-├── RELATORIO_DETALHADO.md       # Este relatório
-│
-├── src/                         # Código fonte
-│   ├── __init__.py
-│   ├── main.py                  # Script principal
-│   ├── models.py                # Estruturas de dados
-│   ├── config.py                # Configurações
-│   ├── population.py            # Lógica de fitness e rotas
-│   ├── genetic_operators.py     # Operadores do GA
-│   ├── cities.py                # Geração de entregas
-│   ├── visualization.py         # Renderização gráfica
-│   │
-│   └── images/                  # Resultados salvos
-│       ├── top_1.png
-│       ├── top_1.csv
-│       ├── top_2.png
-│       ├── top_2.csv
-│       ├── top_3.png
-│       ├── top_3.csv
-│       ├── top_4.png
-│       ├── top_4.csv
-│       ├── top_5.png
-│       └── top_5.csv
-│
-└── tests/                       # Testes unitários
-    ├── __init__.py
-    ├── test_cities.py
-    ├── test_genetic_operators.py
-    └── test_population.py
-```
-
-### 13.2 Requisitos do Sistema
-
-```toml
-[packages]
-pygame = "*"
-numpy = "*"
-matplotlib = "*"
-
-[dev-packages]
-pytest = "*"
-
-[requires]
-python_version = "3.11"
-```
-
-### 13.3 Comandos Úteis
-
-```bash
-# Instalar dependências
-pipenv install
-
-# Executar o sistema
-pipenv run python src/main.py
-
-# Executar testes
-pipenv run pytest tests/ -v
-
-# Executar teste específico
-pipenv run pytest tests/test_genetic_operators.py::TestOrderCrossover -v
-
-# Gerar relatório de cobertura
-pipenv run pytest --cov=src tests/
-```
-
-### 13.4 Glossário de Termos
-
-| Termo | Definição |
-|-------|-----------|
-| **VRP** | Vehicle Routing Problem - Problema de Roteamento de Veículos |
-| **GA** | Genetic Algorithm - Algoritmo Genético |
-| **CVRP** | Capacitated VRP - VRP com restrição de capacidade |
-| **TSP** | Traveling Salesman Problem - Problema do Caixeiro Viajante |
-| **Fitness** | Medida de qualidade de uma solução no GA |
-| **Crossover** | Operador que combina duas soluções (pais) para criar nova (filho) |
-| **Mutação** | Operador que introduz pequenas variações aleatórias |
-| **Elitismo** | Preservação da melhor solução de cada geração |
-| **Convergência** | Estabilização do fitness indicando solução ótima/sub-ótima |
-| **Penalidade** | Valor adicionado ao fitness para desencorajar violações |
-
----
-
-## 14. CONTATO E CONTRIBUIÇÕES
-
-### 14.1 Informações do Projeto
-
-- **Nome**: Tech Challenge - Fase 2
-- **Instituição**: Pós-Graduação FIAP
-- **Repositório**: [GitHub - Tech_challenge_2](https://github.com/Mansufa/Tech_challenge_2)
-- **Branch**: weslley
-- **Licença**: CC0 1.0 Universal (Domínio Público)
-
-### 14.2 Como Contribuir
-
-Contribuições são bem-vindas! Para contribuir:
-
-1. Fork o repositório
-2. Crie uma branch para sua feature (`git checkout -b feature/MinhaFeature`)
-3. Commit suas mudanças (`git commit -m 'Adiciona MinhaFeature'`)
-4. Push para a branch (`git push origin feature/MinhaFeature`)
-5. Abra um Pull Request
-
-### 14.3 Suporte
-
-Para dúvidas ou problemas:
-- Abra uma **Issue** no repositório GitHub
-- Entre em contato através da instituição FIAP
 
 ---
 
@@ -967,10 +684,3 @@ Este relatório cobre completamente todos os requisitos solicitados:
 - **Análise Estatística**: Métricas agregadas e insights
 
 ---
-
-**Relatório gerado em**: 14 de outubro de 2025  
-**Versão do Documento**: 1.0  
-**Status**: ✅ Completo e Revisado
-
----
-
