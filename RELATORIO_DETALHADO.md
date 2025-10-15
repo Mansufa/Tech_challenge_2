@@ -9,6 +9,12 @@
 Este relatório apresenta o desenvolvimento e implementação de um sistema avançado de otimização de rotas para distribuição de medicamentos hospitalares utilizando **Algoritmos Genéticos (GA)** aplicados ao **Problema de Roteamento de Veículos (VRP - Vehicle Routing Problem)**. O sistema foi projetado para lidar com múltiplas restrições do mundo real, incluindo prioridades de entrega baseadas em criticidade dos medicamentos, capacidade de carga dos veículos, autonomia limitada e gerenciamento de múltiplos veículos simultaneamente.
 
 ---
+## Links:
+Repositório -> https://github.com/Mansufa/Tech_challenge_2
+
+Video apresentação -> https://www.youtube.com/watch?v=B4m42YhCTao
+
+---
 
 ## 1. INTRODUÇÃO
 
